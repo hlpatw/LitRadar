@@ -1,0 +1,12 @@
+{"cases":[
+  {"id":1,"priority":"p0","description":"打开首页Dashboard，预期看到6个统计指标卡和欢迎语区块"},
+  {"id":2,"priority":"p0","description":"点击左侧导航「期刊与会议」，进入期刊列表页，预期看到按优先级分组的期刊卡片，点击P0/P1/P2/P3筛选tab可切换"},
+  {"id":3,"priority":"p0","description":"点击左侧导航「论文浏览」，进入论文列表页，预期看到空状态提示「暂无论文」"},
+  {"id":4,"priority":"p0","description":"在论文列表页点击添加按钮创建一篇论文，填写标题后提交，预期列表中出现新论文"},
+  {"id":5,"priority":"p0","description":"点击论文标题进入详情页，预期显示标题、作者、期刊名、摘要、方法、结论等字段"},
+  {"id":6,"priority":"p1","description":"在论文详情页点击收藏星标，预期星标变为实心，然后到Dashboard确认收藏数变为1"},
+  {"id":7,"priority":"p1","description":"点击左侧导航「阅读清单」，添加一条清单项，切换状态到「已读完」"},
+  {"id":8,"priority":"p1","description":"点击左侧导航「笔记」，创建一条笔记含内容，预期笔记卡片出现在列表中"},
+  {"id":9,"priority":"p1","description":"点击左侧导航「设置」，修改专业领域和关键词后保存，预期toast提示保存成功"},
+  {"id":10,"priority":"p2","description":"侧栏折叠/展开按钮可正常切换"}
+]}

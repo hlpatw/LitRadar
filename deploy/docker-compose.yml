@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: litradar
+      POSTGRES_USER: litradar
+      POSTGRES_PASSWORD: litradar_secret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migration.sql:/docker-entrypoint-initdb.d/01_migration.sql
+      - ./seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U litradar -d litradar']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      - DATABASE_URL=postgresql://litradar:litradar_secret@db:5432/litradar
+      - JWT_SECRET=change-me-to-a-random-string
+      - NODE_ENV=production
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=3000
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
