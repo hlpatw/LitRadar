@@ -4,7 +4,7 @@ WORKDIR /build
 COPY . .
 # 关键：用独立部署版文件覆盖开发版入口（这就是原来 deploy/build.sh 做的事）
 COPY deploy/overlay/ ./
-RUN npm install --ignore-scripts
+RUN npm install --ignore-scripts --legacy-peer-deps
 RUN npm run build:server && npm run build:client
 RUN npm prune --omit=dev
 
