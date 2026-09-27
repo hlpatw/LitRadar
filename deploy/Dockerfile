@@ -6,6 +6,7 @@ COPY overlay/ ./
 
 RUN npm install --ignore-scripts
 RUN npm run build:server && npm run build:client
+RUN if [ -f dist/client/client/index.html ]; then mv dist/client/client/index.html dist/client/index.html; fi
 RUN npm prune --omit=dev
 
 FROM node:22-alpine
