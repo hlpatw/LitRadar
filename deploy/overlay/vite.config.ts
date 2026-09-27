@@ -4,7 +4,6 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  root: path.resolve(__dirname, 'client'),
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'client/src'),
@@ -13,6 +12,9 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, 'dist/client'),
     emptyOutDir: true,
+    rollupOptions: {
+      input: path.resolve(__dirname, 'client/index.html'),
+    },
   },
   server: {
     proxy: {
