@@ -11,7 +11,7 @@ async function bootstrap() {
     abortOnError: process.env.NODE_ENV !== 'development',
   });
 
-  app.setGlobalPrefix('api');
+
   app.enableCors();
 
   const logger = new Logger('Bootstrap');
