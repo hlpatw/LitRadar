@@ -6,6 +6,7 @@ COPY deploy/overlay/ ./
 
 RUN npm install --ignore-scripts --legacy-peer-deps
 RUN npm run build:server && npm run build:client
+RUN BUILT="$(find dist/client -mindepth 2 -type f -name index.html | head -n1)"; if [ -n "$BUILT" ]; then cp "$BUILT" dist/client/index.html; fi; test -f dist/client/index.html
 
 # 将 Vite 生成在子目录中的首页复制到后端实际读取的位置
 RUN if [ ! -f dist/client/index.html ]; then \
