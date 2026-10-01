@@ -14,20 +14,30 @@ interface StatCardProps {
   label: string;
   value: number;
   icon: React.ReactNode;
+  href: string;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ label, value, icon }) => (
-  <div className="rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-[22px_24px]">
+const StatCard: React.FC<StatCardProps> = ({
+  label,
+  value,
+  icon,
+  href,
+}) => (
+  <a
+    href={href}
+    className="block rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-[22px_24px] transition-all hover:-translate-y-0.5 hover:border-[var(--primary)] hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+  >
     <div className="mb-3 flex items-center justify-between">
       <span className="font-mono text-[10.5px] leading-[1.4] tracking-[0.06em] uppercase text-[var(--muted-foreground)]">
         {label}
       </span>
       <span className="text-[var(--muted-foreground)]">{icon}</span>
     </div>
+
     <div className="font-serif text-[42px] font-bold leading-[1.06] -tracking-[0.015em] text-[var(--primary)]">
       {value}
     </div>
-  </div>
+  </a>
 );
 
 const SkeletonCard: React.FC = () => (
@@ -44,13 +54,44 @@ const CARD_DEFS: {
   key: keyof DashboardStats;
   label: string;
   icon: React.ReactNode;
+  href: string;
 }[] = [
-  { key: 'journalCount', label: '期刊源', icon: <Library size={18} /> },
-  { key: 'paperCount', label: '论文', icon: <FileText size={18} /> },
-  { key: 'favoriteCount', label: '收藏', icon: <Star size={18} /> },
-  { key: 'checklistTodoCount', label: '待读', icon: <CheckSquare size={18} /> },
-  { key: 'checklistDoneCount', label: '已读', icon: <CheckCircle2 size={18} /> },
-  { key: 'noteCount', label: '笔记', icon: <StickyNote size={18} /> },
+  {
+    key: 'journalCount',
+    label: '期刊源',
+    icon: <Library size={18} />,
+    href: '/journals',
+  },
+  {
+    key: 'paperCount',
+    label: '论文',
+    icon: <FileText size={18} />,
+    href: '/papers',
+  },
+  {
+    key: 'favoriteCount',
+    label: '收藏',
+    icon: <Star size={18} />,
+    href: '/papers',
+  },
+  {
+    key: 'checklistTodoCount',
+    label: '待读',
+    icon: <CheckSquare size={18} />,
+    href: '/checklist',
+  },
+  {
+    key: 'checklistDoneCount',
+    label: '已读',
+    icon: <CheckCircle2 size={18} />,
+    href: '/checklist',
+  },
+  {
+    key: 'noteCount',
+    label: '笔记',
+    icon: <StickyNote size={18} />,
+    href: '/notes',
+  },
 ];
 
 const Dashboard: React.FC = () => {
@@ -101,12 +142,13 @@ const Dashboard: React.FC = () => {
                 <SkeletonCard key={i} />
               ))
             : CARD_DEFS.map((def) => (
-                <StatCard
-                  key={def.key}
-                  label={def.label}
-                  value={stats ? (stats[def.key] as number) : 0}
-                  icon={def.icon}
-                />
+               <StatCard
+  key={def.key}
+  label={def.label}
+  value={stats ? (stats[def.key] as number) : 0}
+  icon={def.icon}
+  href={def.href}
+/>
               ))}
         </div>
       </section>
