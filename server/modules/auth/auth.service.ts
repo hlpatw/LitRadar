@@ -42,9 +42,9 @@ export class AuthService {
         passwordHash,
         displayName: dto.displayName ?? dto.username,
       })
-      .returning({ id: users.id, username: users.username });
+      .returning({ id: users.id, username: users.username, email: users.email });
 
-    const token = this.jwtService.sign({ sub: user.id, username: user.username });
+    const token = this.jwtService.sign({ sub: user.id, username: user.username, email: user.email });
     return { user, token };
   }
 
@@ -63,7 +63,7 @@ export class AuthService {
       throw new UnauthorizedException('用户名或密码错误');
     }
 
-    const token = this.jwtService.sign({ sub: user.id, username: user.username });
+    const token = this.jwtService.sign({ sub: user.id, username: user.username, email: user.email });
     return {
       user: { id: user.id, username: user.username, email: user.email, displayName: user.displayName },
       token,

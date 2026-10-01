@@ -1,3 +1,8 @@
+-- TEST-ONLY BASELINE: NOT used at runtime. The app builds its schema by running
+-- server/database/migrations/*.sql via the tracked migrator on startup. Do NOT mount
+-- this file as a production init script; it exists only to replicate the legacy prod
+-- baseline for local/embedded-Postgres smoke tests.
+
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE journals (

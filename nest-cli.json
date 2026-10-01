@@ -13,6 +13,6 @@
         "stripLeadingPaths": false
       }
     },
-    "assets": []
+    "assets": ["database/migrations/**/*.sql"]
   }
 }

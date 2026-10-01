@@ -80,3 +80,10 @@ UPDATE journals SET status = 'archived'
 WHERE status = 'active'
   AND name NOT IN (SELECT name FROM _catalog)
   AND (issn IS NULL OR issn NOT IN (SELECT issn FROM _catalog WHERE issn IS NOT NULL));
+
+-- 'ready' means a connector is actually wired and polled NOW. Only the 13-source
+-- whitelist is ready; every other crossref-indexed journal is scaffolded (skeleton)
+-- so the UI does not mislead. Conferences/preprints/proceedings are already skeleton.
+UPDATE journals SET connector_status='skeleton'
+WHERE connector_type='crossref' AND status='active'
+  AND issn NOT IN ('0749-596X','0010-0277','0142-7164','0305-0009','1366-7289','0023-8333','0272-2631','0267-6583','0097-8507','0364-0213','1069-9384','0090-502X','0278-7393');
