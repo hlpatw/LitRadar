@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { asc, desc, eq, sql } from 'drizzle-orm';
+import { asc, sql } from 'drizzle-orm';
 import { DATABASE, type Database } from '../../database/database.module';
 import { journals, sourceSyncRuns } from '../../database/schema';
 
@@ -15,10 +15,12 @@ export interface SourceRow {
   issn: string | null;
   status: string;
   connectorType: string | null;
+  connectorStatus: string;
   pollPolicy: string | null;
   lastSyncedAt: string | null;
   lastRunStatus: string | null;
   lastRunInserted: number | null;
+  aliases: string[];
 }
 
 @Injectable()
@@ -44,8 +46,12 @@ export class SourcesService {
         issn: journals.issn,
         status: journals.status,
         connectorType: journals.connectorType,
+        connectorStatus: journals.connectorStatus,
         pollPolicy: journals.pollPolicy,
         lastSyncedAt: journals.lastSyncedAt,
+        aliases: sql<string[]>(
+          `COALESCE((SELECT json_agg(a.alias_name) FROM source_aliases a WHERE a.source_id = journals.id), '[]')`,
+        ),
         lastRunStatus: sql<string | null>(
           `(SELECT s.status FROM source_sync_runs s WHERE s.source_id = journals.id ORDER BY s.started_at DESC LIMIT 1)`,
         ),
@@ -68,8 +74,10 @@ export class SourcesService {
       issn: r.issn,
       status: r.status,
       connectorType: r.connectorType,
+      connectorStatus: r.connectorStatus,
       pollPolicy: r.pollPolicy,
       lastSyncedAt: r.lastSyncedAt ? r.lastSyncedAt.toISOString() : null,
+      aliases: r.aliases || [],
       lastRunStatus: r.lastRunStatus,
       lastRunInserted: r.lastRunInserted,
     }));

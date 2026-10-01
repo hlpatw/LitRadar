@@ -14,9 +14,9 @@ jobs:
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund --legacy-peer-deps
-      - name: Unit + migration tests
-        run: node --experimental-strip-types --test
+      - name: Unit tests (cross-platform)
+        run: npm test
       - name: Build server
         run: npm run build:server
-        env:
-          NODE_ENV: production
+      - name: Build client
+        run: npm run build:client

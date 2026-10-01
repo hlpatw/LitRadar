@@ -23,15 +23,22 @@ export class CrossrefConnector {
   }
 
   /**
-   * Fetch the most recent works for a journal ISSN, newest first. Real network call;
-   * returns mapped papers ready for DOI upsert.
+   * Fetch the most recent works for a journal ISSN, newest first. Real network call.
+   * `since` (ISO date) enables an incremental pull: only works published on/after it
+   * are requested (Crossref from-pub-date filter), so repeat runs fetch only deltas.
    */
-  async fetchRecent(issn: string, rows = 25): Promise<CrossrefFetchResult> {
-    const url =
-      `${this.base}/journals/${encodeURIComponent(issn)}/works` +
-      `?rows=${rows}&sort=published&order=desc` +
-      `&select=DOI,title,author,abstract,issued,URL,type` +
-      `&mailto=${encodeURIComponent(this.mailto)}`;
+  async fetchRecent(issn: string, rows = 25, since?: string): Promise<CrossrefFetchResult> {
+    const params = new URLSearchParams({
+      rows: String(rows),
+      sort: 'published',
+      order: 'desc',
+      select: 'DOI,title,author,abstract,issued,URL,type',
+      mailto: this.mailto,
+    });
+    if (since) {
+      params.set('filter', `from-pub-date:${since}`);
+    }
+    const url = `${this.base}/journals/${encodeURIComponent(issn)}/works?${params.toString()}`;
 
     const res = await this.fetchFn(url, { headers: { 'User-Agent': `LitRadar/1.0 (${this.mailto})` } });
     if (res.status >= 400) {

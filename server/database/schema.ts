@@ -30,6 +30,9 @@ export const journals = pgTable('journals', {
   status: varchar('status', { length: 20 }).notNull().default('active'),
   // How we ingest: crossref | openalex | rss | html | manual | none
   connectorType: varchar('connector_type', { length: 30 }),
+  // Connector maturity: ready = wired & polled; skeleton = planned, not implemented;
+  // disabled = explicitly off. Never fabricate crossref for venues without an ISSN.
+  connectorStatus: varchar('connector_status', { length: 20 }).notNull().default('ready'),
   // How often we poll: daily | weekly | biweekly | monthly | manual
   pollPolicy: varchar('poll_policy', { length: 20 }),
   // Connector bookkeeping: external identifier (e.g. ISSN / OpenAlex source id).

@@ -42,7 +42,11 @@ export class IngestionService {
       .returning({ id: sourceSyncRuns.id });
 
     try {
-      const { items } = await this.crossref.fetchRecent(issn, rows);
+      const { items } = await this.crossref.fetchRecent(
+        issn,
+        rows,
+        src.lastSyncedAt ? src.lastSyncedAt.toISOString().slice(0, 10) : undefined,
+      );
       const dois = items.map((i) => normalizeDoi(i.doi)!).filter(Boolean);
 
       // Determine which DOIs already exist (idempotency / inserted-vs-updated accounting).
@@ -71,7 +75,9 @@ export class IngestionService {
           })
           .onConflictDoUpdate({
             target: papers.doi,
-            targetWhere: sql`doi IS NOT NULL`,
+            // Must EXACTLY match the partial unique index papers_doi_unique
+            // (schema.ts: WHERE doi IS NOT NULL AND doi <> '').
+            targetWhere: sql`doi IS NOT NULL AND doi <> ''`,
             set: {
               title: item.title,
               authors: item.authors,

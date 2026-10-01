@@ -12,10 +12,12 @@ export interface SourceRow {
   issn: string | null;
   status: 'active' | 'archived';
   connectorType: string | null;
+  connectorStatus: 'ready' | 'skeleton' | 'disabled';
   pollPolicy: string | null;
   lastSyncedAt: string | null;
   lastRunStatus: string | null;
   lastRunInserted: number | null;
+  aliases: string[];
 }
 
 export async function getSources(): Promise<SourceRow[]> {

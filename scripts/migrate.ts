@@ -1,39 +1,32 @@
-// Migration runner: applies server/database/migrations against DATABASE_URL.
-// Usage: node --experimental-strip-types scripts/migrate.ts up|down
-// Idempotent: up.sql files use IF NOT EXISTS and can be re-run safely.
-import { readFileSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+// CLI migration runner: up | down | reset.
+// Usage: DATABASE_URL=... node --experimental-strip-types scripts/migrate.ts up
 import { Client } from 'pg';
-
-const here = dirname(fileURLToPath(import.meta.url));
-const dir = join(here, '..', 'server', 'database', 'migrations');
+import { runUp, runDownOne } from '../server/database/migrator.ts';
 
 async function main() {
   const cmd = process.argv[2] || 'up';
   const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error('DATABASE_URL is required');
-  }
+  if (!connectionString) throw new Error('DATABASE_URL is required');
   const client = new Client({ connectionString });
   await client.connect();
   try {
-    const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
-    for (const f of files) {
-      const wantUp = cmd === 'up';
-      const isUp = f.endsWith('.up.sql');
-      if (wantUp !== isUp) continue;
-      const sql = readFileSync(join(dir, f), 'utf8');
-      console.log(`[migrate:${cmd}] applying ${f}`);
-      await client.query(sql);
+    if (cmd === 'up') {
+      const ran = await runUp(client);
+      console.log(ran.length ? `[migrate] applied: ${ran.join(', ')}` : '[migrate] already up to date');
+    } else if (cmd === 'down') {
+      const undone = await runDownOne(client);
+      console.log(undone ? `[migrate] reverted: ${undone}` : '[migrate] nothing to revert');
+    } else if (cmd === 'reset') {
+      for (;;) {
+        const undone = await runDownOne(client);
+        if (!undone) break;
+        console.log(`[migrate] reverted: ${undone}`);
+      }
+    } else {
+      throw new Error(`unknown cmd ${cmd}`);
     }
-    console.log(`[migrate:${cmd}] done`);
   } finally {
     await client.end();
   }
 }
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+main().catch((e) => { console.error(e); process.exit(1); });

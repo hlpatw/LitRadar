@@ -3,6 +3,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Library,
+  Radio,
   FileText,
   CheckSquare,
   StickyNote,
@@ -15,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/sources', label: '追踪来源', icon: Radio },
   { path: '/journals', label: '期刊与会议', icon: Library },
   { path: '/papers', label: '论文浏览', icon: FileText },
   { path: '/checklist', label: '阅读清单', icon: CheckSquare },

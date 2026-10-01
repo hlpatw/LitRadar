@@ -6,11 +6,11 @@ services:
     environment:
       POSTGRES_DB: litradar
       POSTGRES_USER: litradar
-      POSTGRES_PASSWORD: litradar_secret
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a strong POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./migration.sql:/docker-entrypoint-initdb.d/01_migration.sql
-      - ./seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+      # Schema is created by the app's tracked migration runner on startup (single source
+      # of truth). Do NOT mount deploy/migration.sql here (would fork the schema).
     ports:
       - '5432:5432'
     healthcheck:
@@ -24,8 +24,11 @@ services:
     ports:
       - '3000:3000'
     environment:
-      - DATABASE_URL=postgresql://litradar:litradar_secret@db:5432/litradar
-      - JWT_SECRET=change-me-to-a-random-string
+      - DATABASE_URL=postgresql://litradar:${POSTGRES_PASSWORD}@db:5432/litradar
+      # MUST be a long random string; the app refuses to boot in production otherwise.
+      - JWT_SECRET=${JWT_SECRET:?set a long random JWT_SECRET}
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
+      - ADMIN_EMAILS=${ADMIN_EMAILS:-}
       - NODE_ENV=production
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=3000

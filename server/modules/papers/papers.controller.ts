@@ -16,11 +16,10 @@ import {
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/auth.guard';
 import { PapersService } from './papers.service';
+import { CreatePaperDto, UpdatePaperDto } from './dto/paper.dto';
 import type {
   PaperItem,
   PaperDetail,
-  CreatePaperRequest,
-  UpdatePaperRequest,
   PaginatedResponse,
 } from '@shared/api.interface';
 
@@ -50,7 +49,7 @@ export class PapersController {
   @HttpCode(201)
   async create(
     @Req() req: Request,
-    @Body() dto: CreatePaperRequest,
+    @Body() dto: CreatePaperDto,
   ): Promise<PaperItem> {
     const { userId } = req.user as { userId: string };
     return this.papersService.create(dto, userId);
@@ -61,7 +60,7 @@ export class PapersController {
   async update(
     @Req() req: Request,
     @Param('id') id: string,
-    @Body() dto: UpdatePaperRequest,
+    @Body() dto: UpdatePaperDto,
   ): Promise<PaperItem> {
     const { userId } = req.user as { userId: string };
     return this.papersService.update(id, dto, userId);

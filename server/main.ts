@@ -1,18 +1,50 @@
 import { NestFactory } from '@nestjs/core';
-import { Logger } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { join } from 'path';
 import { __express as hbsExpressEngine } from 'hbs';
+import { Client } from 'pg';
 
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
+import { runUp } from './database/migrator';
 
 async function bootstrap() {
+  // B3: apply pending migrations before serving traffic. Tracks state in _migrations so a
+  // fresh DB builds fully and an existing DB only applies deltas. Single source of truth
+  // (no separate deploy/migration.sql fork at runtime).
+  if (process.env.DATABASE_URL) {
+    const migClient = new Client({ connectionString: process.env.DATABASE_URL });
+    await migClient.connect();
+    try {
+      const applied = await runUp(migClient);
+      if (applied.length) new Logger('Migrations').log(`applied: ${applied.join(', ')}`);
+    } finally {
+      await migClient.end();
+    }
+  }
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     abortOnError: process.env.NODE_ENV !== 'development',
   });
 
   app.setGlobalPrefix('api', { exclude: ['health', 'healthz'] });
-  app.enableCors();
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
+  // Restrict CORS to an explicit origin in production (never wildcard there).
+  const corsOrigin = process.env.CORS_ORIGIN;
+  app.enableCors(
+    corsOrigin
+      ? { origin: corsOrigin.split(',').map((s) => s.trim()), credentials: true }
+      : true,
+  );
+
+  // Refuse to boot in production with a missing/weak JWT secret.
+  if (process.env.NODE_ENV === 'production') {
+    const secret = process.env.JWT_SECRET || '';
+    if (secret.length < 32 || /change-me|default|secret/i.test(secret)) {
+      throw new Error('JWT_SECRET must be set to a long, non-default random value in production');
+    }
+  }
 
   const logger = new Logger('Bootstrap');
   const host = process.env.SERVER_HOST || '0.0.0.0';

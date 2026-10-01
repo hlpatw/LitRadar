@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import NotFound from './pages/NotFound/NotFound';
 import Dashboard from './pages/Dashboard/Dashboard';
 import Journals from './pages/Journals/Journals';
+import Sources from './pages/Sources/Sources';
 import Papers from './pages/Papers/Papers';
 import PaperDetail from './pages/Papers/PaperDetail';
 import Checklist from './pages/Checklist/Checklist';
@@ -40,6 +41,7 @@ const RoutesComponent = () => {
       <Route element={<ProtectedLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="journals" element={<Journals />} />
+        <Route path="sources" element={<Sources />} />
         <Route path="papers" element={<Papers />} />
         <Route path="papers/:id" element={<PaperDetail />} />
         <Route path="checklist" element={<Checklist />} />

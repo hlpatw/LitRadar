@@ -63,6 +63,9 @@ pnpm-lock.yaml
 # Local install log
 install.log
 
+# Throwaway embedded postgres data (smoke tests)
+.pgdata-smoke/
+
 # Agent files
 .agent/
 .npm_cache
