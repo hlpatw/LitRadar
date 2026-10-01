@@ -11,6 +11,7 @@
     "start": "cross-env NODE_ENV=production node dist/server/main.js",
     "test": "node --experimental-strip-types --test",
     "test:pg": "node --experimental-strip-types scripts/pg.real.smoke.ts",
+    "test:di": "node --experimental-strip-types scripts/di.startup.ts",
     "migrate": "node --experimental-strip-types scripts/migrate.ts"
   },
   "dependencies": {
@@ -40,6 +41,7 @@
   "devDependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@nestjs/cli": "^10.4.9",
+    "@nestjs/testing": "^10.4.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.10",

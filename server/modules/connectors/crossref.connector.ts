@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import { CrossrefWork, mapCrossrefWork, MappedPaper } from './crossref.mapper';
 
 export interface CrossrefFetchResult {
@@ -12,14 +12,17 @@ export type FetchFn = (url: string, init?: Record<string, unknown>) => Promise<{
   json: () => Promise<unknown>;
 }>;
 
+// Explicit DI token — cannot rely on the (erased) FetchFn type as a paramtype.
+export const CROSSREF_FETCH_FN = 'CROSSREF_FETCH_FN';
+
 @Injectable()
 export class CrossrefConnector {
   private readonly base = 'https://api.crossref.org';
   private readonly mailto = process.env.CROSSREF_MAILTO || 'litradar@example.com';
   private readonly fetchFn: FetchFn;
 
-  constructor(fetchFn?: FetchFn) {
-    this.fetchFn = (fetchFn ?? globalThis.fetch) as unknown as FetchFn;
+  constructor(@Optional() @Inject(CROSSREF_FETCH_FN) injected?: FetchFn) {
+    this.fetchFn = (injected ?? (globalThis as any).fetch) as unknown as FetchFn;
   }
 
   /**
