@@ -27,6 +27,7 @@ import type {
   CreateFavoriteRequest,
 } from '@shared/api.interface';
 
+@UseGuards(JwtAuthGuard)
 @Controller('api/workspace')
 export class WorkspaceController {
   constructor(private readonly workspaceService: WorkspaceService) {}
@@ -35,7 +36,7 @@ export class WorkspaceController {
 
   @Get('dashboard')
   async getDashboard(@Req() req: Request): Promise<DashboardStats> {
-    const { userId } = (req as any).user.userId;
+    const { userId } = (req as any).user;
     return this.workspaceService.getDashboard(userId);
   }
 
@@ -44,7 +45,7 @@ export class WorkspaceController {
   @UseGuards(JwtAuthGuard)
   @Get('favorites')
   async listFavorites(@Req() req: Request): Promise<FavoriteItem[]> {
-    const { userId } = (req as any).user.userId;
+    const { userId } = (req as any).user;
     return this.workspaceService.listFavorites(userId);
   }
 
@@ -54,7 +55,7 @@ export class WorkspaceController {
     @Req() req: Request,
     @Body() body: CreateFavoriteRequest,
   ): Promise<void> {
-    const { userId } = (req as any).user.userId;
+    const { userId } = (req as any).user;
     return this.workspaceService.addFavorite(userId, body.paperId);
   }
 
@@ -64,7 +65,7 @@ export class WorkspaceController {
     @Req() req: Request,
     @Param('paperId') paperId: string,
   ): Promise<void> {
-    const { userId } = (req as any).user.userId;
+    const { userId } = (req as any).user;
     return this.workspaceService.removeFavorite(userId, paperId);
   }
 
@@ -72,7 +73,7 @@ export class WorkspaceController {
 
   @Get('checklist')
   async listChecklist(@Req() req: Request): Promise<ChecklistItem[]> {
-    const { userId } = (req as any).user.userId;
+    const { userId } = (req as any).user;
     return this.workspaceService.listChecklist(userId);
   }
 
@@ -82,7 +83,7 @@ export class WorkspaceController {
     @Req() req: Request,
     @Body() body: CreateChecklistRequest,
   ): Promise<ChecklistItem> {
-    const { userId } = (req as any).user.userId;
+    const { userId } = (req as any).user;
     return this.workspaceService.createChecklistItem(userId, body);
   }
 
@@ -93,7 +94,7 @@ export class WorkspaceController {
     @Param('id') id: string,
     @Body() body: UpdateChecklistRequest,
   ): Promise<ChecklistItem> {
-    const { userId } = (req as any).user.userId;
+    const { userId } = (req as any).user;
     return this.workspaceService.updateChecklistItem(userId, id, body);
   }
 
@@ -103,7 +104,7 @@ export class WorkspaceController {
     @Req() req: Request,
     @Param('id') id: string,
   ): Promise<void> {
-    const { userId } = (req as any).user.userId;
+    const { userId } = (req as any).user;
     return this.workspaceService.deleteChecklistItem(userId, id);
   }
 
@@ -112,7 +113,7 @@ export class WorkspaceController {
   @UseGuards(JwtAuthGuard)
   @Get('notes')
   async listNotes(@Req() req: Request): Promise<NoteItem[]> {
-    const { userId } = (req as any).user.userId;
+    const { userId } = (req as any).user;
     return this.workspaceService.listNotes(userId);
   }
 
@@ -122,7 +123,7 @@ export class WorkspaceController {
     @Req() req: Request,
     @Body() body: CreateNoteRequest,
   ): Promise<NoteItem> {
-    const { userId } = (req as any).user.userId;
+    const { userId } = (req as any).user;
     return this.workspaceService.createNote(userId, body);
   }
 
@@ -133,7 +134,7 @@ export class WorkspaceController {
     @Param('id') id: string,
     @Body() body: UpdateNoteRequest,
   ): Promise<NoteItem> {
-    const { userId } = (req as any).user.userId;
+    const { userId } = (req as any).user;
     return this.workspaceService.updateNote(userId, id, body);
   }
 
@@ -143,7 +144,7 @@ export class WorkspaceController {
     @Req() req: Request,
     @Param('id') id: string,
   ): Promise<void> {
-    const { userId } = (req as any).user.userId;
+    const { userId } = (req as any).user;
     return this.workspaceService.deleteNote(userId, id);
   }
 
@@ -152,7 +153,7 @@ export class WorkspaceController {
   @UseGuards(JwtAuthGuard)
   @Get('settings')
   async getSettings(@Req() req: Request): Promise<UserSettings> {
-    const { userId } = (req as any).user.userId;
+    const { userId } = (req as any).user;
     return this.workspaceService.getSettings(userId);
   }
 
@@ -162,7 +163,7 @@ export class WorkspaceController {
     @Req() req: Request,
     @Body() body: UpdateSettingsRequest,
   ): Promise<UserSettings> {
-    const { userId } = (req as any).user.userId;
+    const { userId } = (req as any).user;
     return this.workspaceService.updateSettings(userId, body);
   }
 }
