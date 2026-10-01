@@ -65,6 +65,26 @@ async function runSteps() {
     const total = await q(`SELECT COUNT(*) c FROM journals`);
     console.log('[ok] total journals:', total[0].c);
 
+    // ===== SourcesService.list() equivalent query (catches the SQL syntax error) =====
+    const sourcesRows = await q(`
+      SELECT
+        journals.id, journals.parent_id, journals.name, journals.abbreviation,
+        journals.source_type, journals.priority, journals.category, journals.url,
+        journals.issn, journals.status, journals.connector_type, journals.connector_status,
+        journals.poll_policy, journals.last_synced_at,
+        COALESCE((SELECT json_agg(a.alias_name) FROM source_aliases a WHERE a.source_id = journals.id), '[]') AS aliases,
+        (SELECT s.status FROM source_sync_runs s WHERE s.source_id = journals.id ORDER BY s.started_at DESC LIMIT 1) AS last_run_status,
+        (SELECT s.inserted_count FROM source_sync_runs s WHERE s.source_id = journals.id ORDER BY s.started_at DESC LIMIT 1) AS last_run_inserted
+      FROM journals
+      ORDER BY journals.priority ASC, journals.name ASC
+    `);
+    console.log('[ok] /api/sources query executed; rows:', sourcesRows.length);
+    const readyN = sourcesRows.filter((r: any) => r.connector_status === 'ready').length;
+    const skelN = sourcesRows.filter((r: any) => r.connector_status === 'skeleton').length;
+    console.log('[ok] sources ready/skeleton:', readyN, '/', skelN);
+    if (readyN !== 7) throw new Error('expected 7 ready sources, got ' + readyN);
+    console.log('[ok] sources query returns aliases as array:', Array.isArray(sourcesRows[0].aliases));
+
     // non-crossref sources must NOT carry a crossref ISSN / be marked skeleton
     const bad = await q(`SELECT name FROM journals WHERE source_type<>'journal' AND connector_type='crossref'`);
     if (bad.length) throw new Error('non-journal wrongly marked crossref: ' + JSON.stringify(bad));

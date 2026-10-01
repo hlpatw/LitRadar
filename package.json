@@ -12,6 +12,7 @@
     "test": "node --experimental-strip-types --test",
     "test:pg": "node --experimental-strip-types scripts/pg.real.smoke.ts",
     "test:di": "node --experimental-strip-types scripts/di.startup.ts",
+    "test:http": "node --experimental-strip-types scripts/http.routes.ts",
     "migrate": "node --experimental-strip-types scripts/migrate.ts"
   },
   "dependencies": {

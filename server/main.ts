@@ -27,7 +27,9 @@ async function bootstrap() {
     abortOnError: process.env.NODE_ENV !== 'development',
   });
 
-  app.setGlobalPrefix('api', { exclude: ['health', 'healthz'] });
+  // Routing: controllers already declare their own 'api/...' paths. Do NOT add a
+  // global 'api' prefix, or every route becomes /api/api/... (the double-/api bug).
+  // HealthController is 'health' and is served at the root /health.
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   // Restrict CORS to an explicit origin in production (never wildcard there).

@@ -49,15 +49,9 @@ export class SourcesService {
         connectorStatus: journals.connectorStatus,
         pollPolicy: journals.pollPolicy,
         lastSyncedAt: journals.lastSyncedAt,
-        aliases: sql<string[]>(
-          `COALESCE((SELECT json_agg(a.alias_name) FROM source_aliases a WHERE a.source_id = journals.id), '[]')`,
-        ),
-        lastRunStatus: sql<string | null>(
-          `(SELECT s.status FROM source_sync_runs s WHERE s.source_id = journals.id ORDER BY s.started_at DESC LIMIT 1)`,
-        ),
-        lastRunInserted: sql<number | null>(
-          `(SELECT s.inserted_count FROM source_sync_runs s WHERE s.source_id = journals.id ORDER BY s.started_at DESC LIMIT 1)`,
-        ),
+        aliases: sql<string[]>`COALESCE((SELECT json_agg(a.alias_name) FROM source_aliases a WHERE a.source_id = journals.id), '[]')`,
+        lastRunStatus: sql<string | null>`(SELECT s.status FROM source_sync_runs s WHERE s.source_id = journals.id ORDER BY s.started_at DESC LIMIT 1)`,
+        lastRunInserted: sql<number | null>`(SELECT s.inserted_count FROM source_sync_runs s WHERE s.source_id = journals.id ORDER BY s.started_at DESC LIMIT 1)`,
       })
       .from(journals)
       .orderBy(asc(journals.priority), asc(journals.name));
