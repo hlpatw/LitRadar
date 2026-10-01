@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Library,
@@ -60,21 +60,21 @@ const Layout = () => {
             const isActive = item.path === '/'
               ? location.pathname === '/'
               : location.pathname.startsWith(item.path);
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-                  isActive
-                    ? 'bg-[var(--accent)] font-medium text-[var(--accent-foreground)]'
-                    : 'text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)]'
-                } ${collapsed ? 'justify-center' : ''}`}
-                title={collapsed ? item.label : undefined}
-              >
-                <Icon size={18} />
-                {!collapsed && <span>{item.label}</span>}
-              </NavLink>
-            );
+           return (
+  <a
+    key={item.path}
+    href={item.path}
+    className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+      isActive
+        ? 'bg-[var(--accent)] font-medium text-[var(--accent-foreground)]'
+        : 'text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)]'
+    } ${collapsed ? 'justify-center' : ''}`}
+    title={collapsed ? item.label : undefined}
+  >
+    <Icon size={18} />
+    {!collapsed && <span>{item.label}</span>}
+  </a>
+);
           })}
         </nav>
 
