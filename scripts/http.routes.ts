@@ -84,6 +84,14 @@ async function main() {
     if (dbl.status === 200) throw new Error('double /api still served!');
     console.log('[ok] GET /api/api/sources -> ' + dbl.status + ' (double /api removed)');
 
+    // 3b) other single-prefix public routes 200, their double-prefix 404
+    const j = await get('/api/journals');
+    if (j.status !== 200) throw new Error('GET /api/journals -> ' + j.status);
+    console.log('[ok] GET /api/journals -> 200');
+    const dblJ = await get('/api/api/journals');
+    if (dblJ.status === 200) throw new Error('double /api/journals still served!');
+    console.log('[ok] GET /api/api/journals -> ' + dblJ.status);
+
     // 4) invalid paper id -> 400, no SQL/stack leak
     const p = await get('/api/papers/1');
     const pb = typeof p.body === 'string' ? p.body : JSON.stringify(p.body);

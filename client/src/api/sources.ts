@@ -21,6 +21,6 @@ export interface SourceRow {
 }
 
 export async function getSources(): Promise<SourceRow[]> {
-  const res = await api.get('/api/sources');
+  const res = await api.get('/sources');
   return res.data;
 }

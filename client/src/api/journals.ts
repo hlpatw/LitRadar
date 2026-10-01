@@ -6,6 +6,6 @@ export async function getJournals(params?: { priority?: string; type?: string })
   if (params?.priority) searchParams.set('priority', params.priority);
   if (params?.type) searchParams.set('type', params.type);
   const qs = searchParams.toString();
-  const res = await api.get(`/api/journals${qs ? `?${qs}` : ''}`);
+  const res = await api.get(`/journals${qs ? `?${qs}` : ''}`);
   return res.data;
 }
