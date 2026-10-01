@@ -1,7 +1,7 @@
 FROM node:22-alpine AS builder
 WORKDIR /build
 COPY . .
-COPY deploy/overlay/ ./
+# Single source of truth: root IS the production app (no deploy/overlay merge).
 RUN npm install --ignore-scripts
 RUN npm run build:server && npm run build:client
 RUN npm prune --omit=dev

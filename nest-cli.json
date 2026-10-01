@@ -13,12 +13,6 @@
         "stripLeadingPaths": false
       }
     },
-    "assets": [
-      {
-        "include": "capabilities/**/*.json",
-        "outDir": "dist/server",
-        "watchAssets": true
-      }
-    ]
+    "assets": []
   }
 }

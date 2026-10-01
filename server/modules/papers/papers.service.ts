@@ -4,9 +4,10 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
-import { DRIZZLE_DATABASE, type PostgresJsDatabase } from '@lark-apaas/fullstack-nestjs-core';
+import { DATABASE, type Database } from '../../database/database.module';
 import { eq, and, ilike, count, sql } from 'drizzle-orm';
 import { papers, journals } from '../../database/schema';
+import { isValidUuid, normalizeDoi, isValidDoi } from '../../common/utils/doi.util';
 import type {
   PaperItem,
   PaperDetail,
@@ -18,7 +19,7 @@ import type {
 @Injectable()
 export class PapersService {
   constructor(
-    @Inject(DRIZZLE_DATABASE) private readonly db: PostgresJsDatabase,
+    @Inject(DATABASE) private readonly db: Database,
   ) {}
 
   async list(
@@ -64,6 +65,9 @@ export class PapersService {
   }
 
   async detail(id: string): Promise<PaperDetail> {
+    // Explicit identifier validation: non-UUID input is a 400, never a SQL error/500.
+    this.assertUuid(id);
+
     const rows = await this.db
       .select()
       .from(papers)
@@ -89,14 +93,17 @@ export class PapersService {
     if (!dto.title || dto.title.trim().length === 0) {
       throw new BadRequestException('标题不能为空');
     }
+    const doi = this.prepareDoi(dto.doi);
 
+    // Idempotent upsert on DOI: inserting a paper whose DOI already exists updates it
+    // instead of violating the partial unique index.
     const [row] = await this.db
       .insert(papers)
       .values({
         journalId: dto.journalId ?? null,
         title: dto.title.trim(),
         authors: dto.authors ?? null,
-        doi: dto.doi ?? null,
+        doi,
         keywords: dto.keywords ?? null,
         abstractText: dto.abstractText ?? null,
         methods: dto.methods ?? null,
@@ -105,6 +112,18 @@ export class PapersService {
         url: dto.url ?? null,
         createdBy: userId,
         updatedBy: userId,
+      })
+      .onConflictDoUpdate({
+        target: papers.doi,
+        targetWhere: sql`doi IS NOT NULL`,
+        set: {
+          title: dto.title.trim(),
+          authors: dto.authors ?? null,
+          abstractText: dto.abstractText ?? null,
+          publishedDate: dto.publishedDate ?? null,
+          url: dto.url ?? null,
+          updatedBy: userId,
+        },
       })
       .returning();
 
@@ -116,6 +135,7 @@ export class PapersService {
     dto: UpdatePaperRequest,
     userId: string,
   ): Promise<PaperItem> {
+    this.assertUuid(id);
     const patch: Partial<typeof papers.$inferInsert> = {};
 
     if (dto.title !== undefined) {
@@ -125,7 +145,7 @@ export class PapersService {
       patch.title = dto.title.trim();
     }
     if (dto.authors !== undefined) patch.authors = dto.authors;
-    if (dto.doi !== undefined) patch.doi = dto.doi;
+    if (dto.doi !== undefined) patch.doi = this.prepareDoi(dto.doi);
     if (dto.keywords !== undefined) patch.keywords = dto.keywords;
     if (dto.abstractText !== undefined)
       patch.abstractText = dto.abstractText;
@@ -157,6 +177,7 @@ export class PapersService {
   }
 
   async delete(id: string): Promise<void> {
+    this.assertUuid(id);
     const [deleted] = await this.db
       .delete(papers)
       .where(eq(papers.id, id))
@@ -165,6 +186,22 @@ export class PapersService {
     if (!deleted) {
       throw new NotFoundException('论文不存在');
     }
+  }
+
+  private assertUuid(id: string): void {
+    if (!isValidUuid(id)) {
+      throw new BadRequestException('非法的论文 ID（应为 UUID）');
+    }
+  }
+
+  private prepareDoi(raw: string | undefined): string | null {
+    if (raw === undefined || raw === null) return null;
+    const normalized = normalizeDoi(raw);
+    if (normalized === null) return null; // empty -> null (allowed)
+    if (!isValidDoi(normalized)) {
+      throw new BadRequestException('非法的 DOI');
+    }
+    return normalized;
   }
 
   private mapToPaperItem(

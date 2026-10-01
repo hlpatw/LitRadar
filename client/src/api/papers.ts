@@ -1,4 +1,4 @@
-import { axiosForBackend } from '@lark-apaas/client-toolkit/utils/getAxiosForBackend';
+import api from '../utils/axios';
 import type { PaperItem, PaperDetail, CreatePaperRequest, UpdatePaperRequest, PaginatedResponse } from '@shared/api.interface';
 
 export async function getPapers(params?: { journalId?: string; search?: string; page?: number; pageSize?: number }): Promise<PaginatedResponse<PaperItem>> {
@@ -8,25 +8,25 @@ export async function getPapers(params?: { journalId?: string; search?: string; 
   if (params?.page) sp.set('page', String(params.page));
   if (params?.pageSize) sp.set('pageSize', String(params.pageSize));
   const qs = sp.toString();
-  const res = await axiosForBackend({ url: `/api/papers${qs ? `?${qs}` : ''}`, method: 'GET' });
+  const res = await api.get(`/api/papers${qs ? `?${qs}` : ''}`);
   return res.data;
 }
 
 export async function getPaperDetail(id: string): Promise<PaperDetail> {
-  const res = await axiosForBackend({ url: `/api/papers/${id}`, method: 'GET' });
+  const res = await api.get(`/api/papers/${id}`);
   return res.data;
 }
 
 export async function createPaper(data: CreatePaperRequest): Promise<PaperItem> {
-  const res = await axiosForBackend({ url: '/api/papers', method: 'POST', data });
+  const res = await api.post('/api/papers', data);
   return res.data;
 }
 
 export async function updatePaper(id: string, data: UpdatePaperRequest): Promise<PaperItem> {
-  const res = await axiosForBackend({ url: `/api/papers/${id}`, method: 'PATCH', data });
+  const res = await api.patch(`/api/papers/${id}`, data);
   return res.data;
 }
 
 export async function deletePaper(id: string): Promise<void> {
-  await axiosForBackend({ url: `/api/papers/${id}`, method: 'DELETE' });
+  await api.delete(`/api/papers/${id}`);
 }

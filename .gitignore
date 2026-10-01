@@ -60,6 +60,9 @@ pnpm-lock.yaml
 # swc wasm
 .swc
 
+# Local install log
+install.log
+
 # Agent files
 .agent/
 .npm_cache

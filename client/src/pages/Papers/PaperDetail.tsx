@@ -2,7 +2,7 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Star, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { logger } from '@lark-apaas/client-toolkit/logger';
+import { logger } from '../../utils/logger';
 import { papers, workspace } from '@/api';
 import type {
   PaperDetail as PaperDetailType,

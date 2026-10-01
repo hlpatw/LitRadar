@@ -60,14 +60,19 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         },
       };
     } else {
-      // 未知异常
+      // 未知异常. Production: never leak stack/cause/SQL internals to the client.
       httpStatus = HttpStatus.INTERNAL_SERVER_ERROR;
+      const isProd = process.env.NODE_ENV === 'production';
       errorResponse = {
         error: {
           code: ResponseCode.INTERNAL_ERROR,
           message: '服务器内部错误',
-          stack: (exception as Error).stack,
-          cause: (exception as Error).cause as string,
+          ...(isProd
+            ? {}
+            : {
+                stack: (exception as Error).stack,
+                cause: (exception as Error).cause as string,
+              }),
           timestamp: Date.now(),
         },
       };

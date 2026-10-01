@@ -1,0 +1,16 @@
+-- 0002_reconcile.down.sql
+-- Reverse the 0002 reconciliation (drops added aliases, the inserted topiCS row, and un-archives
+-- the rows it archived). The CUNY->HSP identity rename is intentionally left in place: it is a
+-- correct correction, and restoring the old name/URL is a content decision, not a schema rollback.
+
+DELETE FROM journals WHERE name = 'Topics in Cognitive Science';
+
+DELETE FROM source_aliases
+WHERE alias_name IN (
+  'Language and Cognitive Processes',
+  'CUNY Conference on Human Sentence Processing',
+  'Annual Meeting of the Cognitive Science Society'
+);
+
+UPDATE journals SET status = 'active'
+WHERE issn = '0169-0965' OR name = 'Annual Meeting of the Cognitive Science Society';

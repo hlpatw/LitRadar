@@ -3,32 +3,21 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { ErrorBoundary } from 'react-error-boundary';
 
-import { AppContainer } from '@lark-apaas/client-toolkit/components/AppContainer';
-import { ErrorRender } from '@lark-apaas/client-toolkit/components/ErrorRender';
-
 import RoutesComponent from './app.tsx';
 import './index.css';
-import { createPortal } from 'react-dom';
 import { Toaster } from '@client/src/components/ui/sonner';
-
-const CLIENT_BASE_PATH = process.env.CLIENT_BASE_PATH || '/';
+import { AuthProvider } from '@client/src/contexts/AuthContext';
+import { createPortal } from 'react-dom';
 
 const MainApp = () => {
   return (
-    <BrowserRouter basename={CLIENT_BASE_PATH}>
-      <AppContainer defaultTheme="light">
-        <ErrorBoundary
-          fallbackRender={({ error, resetErrorBoundary }) => (
-            <ErrorRender
-              error={error as Error}
-              resetErrorBoundary={resetErrorBoundary}
-            />
-          )}
-        >
+    <BrowserRouter>
+      <AuthProvider>
+        <ErrorBoundary fallback={<div>Something went wrong</div>}>
           <RoutesComponent />
           {createPortal(<Toaster />, document.body)}
         </ErrorBoundary>
-      </AppContainer>
+      </AuthProvider>
     </BrowserRouter>
   );
 };

@@ -1,11 +1,11 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { DRIZZLE_DATABASE, type PostgresJsDatabase } from '@lark-apaas/fullstack-nestjs-core';
+import { DATABASE, type Database } from '../../database/database.module';
 import { journals } from '../../database/schema';
 import { asc } from 'drizzle-orm';
 
 @Injectable()
 export class JournalsService {
-  constructor(@Inject(DRIZZLE_DATABASE) private readonly db: PostgresJsDatabase) {}
+  constructor(@Inject(DATABASE) private readonly db: Database) {}
 
   async list(priority?: string, type?: string) {
     const conditions = [];

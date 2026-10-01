@@ -8,8 +8,9 @@ import {
   Req,
   Body,
   Param,
+  UseGuards,
 } from '@nestjs/common';
-import { NeedLogin } from '@lark-apaas/fullstack-nestjs-core';
+import { JwtAuthGuard } from '../auth/auth.guard';
 import type { Request } from 'express';
 import { WorkspaceService } from './workspace.service';
 import type {
@@ -34,36 +35,36 @@ export class WorkspaceController {
 
   @Get('dashboard')
   async getDashboard(@Req() req: Request): Promise<DashboardStats> {
-    const { userId } = req.userContext;
+    const { userId } = (req as any).user.userId;
     return this.workspaceService.getDashboard(userId);
   }
 
   // ── Favorites ──
 
-  @NeedLogin()
+  @UseGuards(JwtAuthGuard)
   @Get('favorites')
   async listFavorites(@Req() req: Request): Promise<FavoriteItem[]> {
-    const { userId } = req.userContext;
+    const { userId } = (req as any).user.userId;
     return this.workspaceService.listFavorites(userId);
   }
 
-  @NeedLogin()
+  @UseGuards(JwtAuthGuard)
   @Post('favorites')
   async addFavorite(
     @Req() req: Request,
     @Body() body: CreateFavoriteRequest,
   ): Promise<void> {
-    const { userId } = req.userContext;
+    const { userId } = (req as any).user.userId;
     return this.workspaceService.addFavorite(userId, body.paperId);
   }
 
-  @NeedLogin()
+  @UseGuards(JwtAuthGuard)
   @Delete('favorites/:paperId')
   async removeFavorite(
     @Req() req: Request,
     @Param('paperId') paperId: string,
   ): Promise<void> {
-    const { userId } = req.userContext;
+    const { userId } = (req as any).user.userId;
     return this.workspaceService.removeFavorite(userId, paperId);
   }
 
@@ -71,97 +72,97 @@ export class WorkspaceController {
 
   @Get('checklist')
   async listChecklist(@Req() req: Request): Promise<ChecklistItem[]> {
-    const { userId } = req.userContext;
+    const { userId } = (req as any).user.userId;
     return this.workspaceService.listChecklist(userId);
   }
 
-  @NeedLogin()
+  @UseGuards(JwtAuthGuard)
   @Post('checklist')
   async createChecklistItem(
     @Req() req: Request,
     @Body() body: CreateChecklistRequest,
   ): Promise<ChecklistItem> {
-    const { userId } = req.userContext;
+    const { userId } = (req as any).user.userId;
     return this.workspaceService.createChecklistItem(userId, body);
   }
 
-  @NeedLogin()
+  @UseGuards(JwtAuthGuard)
   @Patch('checklist/:id')
   async updateChecklistItem(
     @Req() req: Request,
     @Param('id') id: string,
     @Body() body: UpdateChecklistRequest,
   ): Promise<ChecklistItem> {
-    const { userId } = req.userContext;
+    const { userId } = (req as any).user.userId;
     return this.workspaceService.updateChecklistItem(userId, id, body);
   }
 
-  @NeedLogin()
+  @UseGuards(JwtAuthGuard)
   @Delete('checklist/:id')
   async deleteChecklistItem(
     @Req() req: Request,
     @Param('id') id: string,
   ): Promise<void> {
-    const { userId } = req.userContext;
+    const { userId } = (req as any).user.userId;
     return this.workspaceService.deleteChecklistItem(userId, id);
   }
 
   // ── Notes ──
 
-  @NeedLogin()
+  @UseGuards(JwtAuthGuard)
   @Get('notes')
   async listNotes(@Req() req: Request): Promise<NoteItem[]> {
-    const { userId } = req.userContext;
+    const { userId } = (req as any).user.userId;
     return this.workspaceService.listNotes(userId);
   }
 
-  @NeedLogin()
+  @UseGuards(JwtAuthGuard)
   @Post('notes')
   async createNote(
     @Req() req: Request,
     @Body() body: CreateNoteRequest,
   ): Promise<NoteItem> {
-    const { userId } = req.userContext;
+    const { userId } = (req as any).user.userId;
     return this.workspaceService.createNote(userId, body);
   }
 
-  @NeedLogin()
+  @UseGuards(JwtAuthGuard)
   @Patch('notes/:id')
   async updateNote(
     @Req() req: Request,
     @Param('id') id: string,
     @Body() body: UpdateNoteRequest,
   ): Promise<NoteItem> {
-    const { userId } = req.userContext;
+    const { userId } = (req as any).user.userId;
     return this.workspaceService.updateNote(userId, id, body);
   }
 
-  @NeedLogin()
+  @UseGuards(JwtAuthGuard)
   @Delete('notes/:id')
   async deleteNote(
     @Req() req: Request,
     @Param('id') id: string,
   ): Promise<void> {
-    const { userId } = req.userContext;
+    const { userId } = (req as any).user.userId;
     return this.workspaceService.deleteNote(userId, id);
   }
 
   // ── Settings ──
 
-  @NeedLogin()
+  @UseGuards(JwtAuthGuard)
   @Get('settings')
   async getSettings(@Req() req: Request): Promise<UserSettings> {
-    const { userId } = req.userContext;
+    const { userId } = (req as any).user.userId;
     return this.workspaceService.getSettings(userId);
   }
 
-  @NeedLogin()
+  @UseGuards(JwtAuthGuard)
   @Put('settings')
   async updateSettings(
     @Req() req: Request,
     @Body() body: UpdateSettingsRequest,
   ): Promise<UserSettings> {
-    const { userId } = req.userContext;
+    const { userId } = (req as any).user.userId;
     return this.workspaceService.updateSettings(userId, body);
   }
 }

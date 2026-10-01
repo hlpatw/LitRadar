@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Star, Search, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { logger } from '@lark-apaas/client-toolkit/logger';
+import { logger } from '../../utils/logger';
 import { journals, papers, workspace } from '@/api';
 import type {
   JournalItem,

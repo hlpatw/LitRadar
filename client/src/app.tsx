@@ -1,5 +1,5 @@
 import React from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, Navigate } from 'react-router-dom';
 
 import Layout from './components/Layout';
 import NotFound from './pages/NotFound/NotFound';
@@ -10,11 +10,34 @@ import PaperDetail from './pages/Papers/PaperDetail';
 import Checklist from './pages/Checklist/Checklist';
 import Notes from './pages/Notes/Notes';
 import Settings from './pages/Settings/Settings';
+import LoginPage from './pages/Login/LoginPage';
+import RegisterPage from './pages/Register/RegisterPage';
+import { useAuth } from './contexts/AuthContext';
+
+function ProtectedLayout() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <p className="text-muted-foreground">加载中...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Layout />;
+}
 
 const RoutesComponent = () => {
   return (
     <Routes>
-      <Route element={<Layout />}>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route element={<ProtectedLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="journals" element={<Journals />} />
         <Route path="papers" element={<Papers />} />

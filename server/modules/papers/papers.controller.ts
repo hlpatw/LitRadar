@@ -11,9 +11,10 @@ import {
   HttpCode,
   ParseIntPipe,
   DefaultValuePipe,
+  UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { NeedLogin } from '@lark-apaas/fullstack-nestjs-core';
+import { JwtAuthGuard } from '../auth/auth.guard';
 import { PapersService } from './papers.service';
 import type {
   PaperItem,
@@ -44,29 +45,29 @@ export class PapersController {
     return this.papersService.detail(id);
   }
 
-  @NeedLogin()
+  @UseGuards(JwtAuthGuard)
   @Post()
   @HttpCode(201)
   async create(
     @Req() req: Request,
     @Body() dto: CreatePaperRequest,
   ): Promise<PaperItem> {
-    const { userId } = req.userContext;
+    const { userId } = req.user as { userId: string };
     return this.papersService.create(dto, userId);
   }
 
-  @NeedLogin()
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async update(
     @Req() req: Request,
     @Param('id') id: string,
     @Body() dto: UpdatePaperRequest,
   ): Promise<PaperItem> {
-    const { userId } = req.userContext;
+    const { userId } = req.user as { userId: string };
     return this.papersService.update(id, dto, userId);
   }
 
-  @NeedLogin()
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   @HttpCode(204)
   async delete(@Param('id') id: string): Promise<void> {

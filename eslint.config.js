@@ -1,5 +1,4 @@
 const tseslint = require('typescript-eslint');
-const { eslintPresetsOfSimple } = require('@lark-apaas/fullstack-presets');
 
 module.exports = tseslint.config(
   {
@@ -7,54 +6,28 @@ module.exports = tseslint.config(
       'dist',
       'dist-server',
       'node_modules',
-      'source_package',
       'client/src/api/gen',
       '**/*.d.ts',
       '**/*.js.map',
+      'client/src/components/business-ui',
     ],
   },
-  // Client configuration
   {
     files: ['client/**/*.{ts,tsx}', 'shared/**/*.{ts,tsx}'],
     extends: [
-      ...eslintPresetsOfSimple.client,
+      ...tseslint.configs.recommended,
     ],
-    languageOptions: {
-      parserOptions: {
-        project: './tsconfig.app.json',
-      },
-    },
-    settings: {
-      'import/resolver': {
-        alias: {
-          map: [
-            ['@', './client/src'],
-            ['@client', './client'],
-            ['@shared', './shared'],
-          ],
-          extensions: ['.js', '.jsx', '.ts', '.tsx'],
-        },
-      },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
-  // Server configuration
   {
     files: ['server/**/*.{ts,tsx}', 'shared/**/*.{ts,tsx}'],
     extends: [
-      ...eslintPresetsOfSimple.server,
+      ...tseslint.configs.recommended,
     ],
-    languageOptions: {
-      parserOptions: {
-        project: './tsconfig.node.json',
-      }
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
-    settings: {
-      'import/resolver': {
-        alias: {
-          map: [['@server', './server'], ['@shared', './shared']],
-          extensions: ['.js', '.jsx', '.ts', '.tsx'],
-        },
-      }
-    }
   },
 );

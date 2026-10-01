@@ -5,9 +5,9 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import {
-  DRIZZLE_DATABASE,
-  type PostgresJsDatabase,
-} from '@lark-apaas/fullstack-nestjs-core';
+  DATABASE,
+  type Database,
+} from '../../database/database.module';
 import {
   userFavorites,
   userNotes,
@@ -51,7 +51,7 @@ function mapPaper(p: typeof papers.$inferSelect): PaperItem {
 @Injectable()
 export class WorkspaceService {
   constructor(
-    @Inject(DRIZZLE_DATABASE) private readonly db: PostgresJsDatabase,
+    @Inject(DATABASE) private readonly db: Database,
   ) {}
 
   // ── Dashboard ──

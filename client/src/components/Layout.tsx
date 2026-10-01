@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Library,
@@ -9,7 +9,9 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  LogOut,
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -23,6 +25,13 @@ const navItems = [
 const Layout = () => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <div className="flex h-screen bg-[var(--background)]">
@@ -70,11 +79,19 @@ const Layout = () => {
         </nav>
 
         <div className="border-t border-[var(--border)] p-3">
-          {!collapsed && (
-            <p className="text-[10.5px] uppercase tracking-[0.06em] text-[var(--muted-foreground)] font-mono">
-              心理语言学文献雷达
+          {!collapsed && user && (
+            <p className="text-[12px] text-[var(--muted-foreground)] truncate">
+              {user.displayName ?? user.username}
             </p>
           )}
+          <button
+            onClick={handleLogout}
+            className="mt-2 flex items-center gap-2 rounded-md px-3 py-1.5 text-[12px] text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--accent-foreground)] w-full"
+            title="退出登录"
+          >
+            <LogOut size={14} />
+            {!collapsed && <span>退出</span>}
+          </button>
         </div>
       </aside>
 
