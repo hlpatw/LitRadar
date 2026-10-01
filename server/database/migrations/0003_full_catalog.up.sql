@@ -7,7 +7,7 @@
 --  * Legacy rows adopted by ISSN/name (UUIDs preserved); unmatched legacy rows archived.
 --  * Idempotent.
 
-ALTER TABLE journals ADD COLUMN IF NOT EXISTS connector_status VARCHAR(20) NOT NULL DEFAULT 'ready';
+ALTER TABLE journals ADD COLUMN IF NOT EXISTS connector_status VARCHAR(20) NOT NULL DEFAULT 'skeleton';
 
 CREATE TEMP TABLE IF NOT EXISTS _catalog(
   name VARCHAR(300), source_type VARCHAR(20), priority VARCHAR(10),
@@ -81,9 +81,9 @@ WHERE status = 'active'
   AND name NOT IN (SELECT name FROM _catalog)
   AND (issn IS NULL OR issn NOT IN (SELECT issn FROM _catalog WHERE issn IS NOT NULL));
 
--- 'ready' means a connector is actually wired and polled NOW. Only the 13-source
--- whitelist is ready; every other crossref-indexed journal is scaffolded (skeleton)
--- so the UI does not mislead. Conferences/preprints/proceedings are already skeleton.
-UPDATE journals SET connector_status='skeleton'
-WHERE connector_type='crossref' AND status='active'
-  AND issn NOT IN ('0749-596X','0010-0277','0142-7164','0305-0009','1366-7289','0023-8333','0272-2631','0267-6583','0097-8507','0364-0213','1069-9384','0090-502X','0278-7393');
+-- 'ready' = a connector actually wired & polled NOW. Only these 7 Crossref journal
+-- ISSNs are ready; every other MVP entity (incl. archived rows) stays skeleton so the
+-- UI does not mislead. Excel 38 combined rows -> 40 entities after venue splits.
+UPDATE journals SET connector_status='skeleton';
+UPDATE journals SET connector_status='ready'
+WHERE issn IN ('0749-596X','0010-0277','0305-0009','0142-7237','0142-7164','1048-6928','1366-7289');

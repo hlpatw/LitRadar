@@ -3,23 +3,22 @@ import { Controller, Post, Param, UseGuards, HttpCode, BadRequestException } fro
 import { AdminOrCliGuard } from '../../common/guards/admin.guard';
 import { CrossrefConnector } from './crossref.connector';
 import { IngestionService, SyncOutcome } from './ingestion.service';
-import { getMvpSourceByIssn } from '../sources/mvp.sources';
+import { getMvpSourceByIssn, isCrossrefReady } from '../sources/mvp.sources';
 
 @Controller('api/connectors')
 export class ConnectorsController {
   constructor(private readonly ingestion: IngestionService) {}
 
   // Manual trigger for one source (by ISSN).
-  // Admin-or-CLI only: a normal logged-in user cannot trigger outbound fetches + bulk writes.
-  // Only sources wired for real polling (crossref, ready) may be pulled; skeleton venues 400.
+  // Admin-or-CLI only. Only the 7 Crossref-runnable MVP ISSNs may be pulled; every
+  // other MVP entity (conferences/arXiv/ACL/LDR) is skeleton and returns 400.
   @UseGuards(AdminOrCliGuard)
   @Post('sync/:issn')
   @HttpCode(200)
   sync(@Param('issn') issn: string): Promise<SyncOutcome> {
-    const cfg = getMvpSourceByIssn(issn);
-    if (!cfg || cfg.connectorType !== 'crossref') {
+    if (!isCrossrefReady(issn)) {
       throw new BadRequestException(
-        `No polled Crossref source for ISSN ${issn} (venue is skeleton/not wired)`,
+        `No pollable Crossref source for ISSN ${issn} (not in the 7-ISSN ready whitelist)`,
       );
     }
     return this.ingestion.syncSourceByIssn(issn);
