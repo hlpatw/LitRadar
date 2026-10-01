@@ -8,25 +8,25 @@ export async function getPapers(params?: { journalId?: string; search?: string; 
   if (params?.page) sp.set('page', String(params.page));
   if (params?.pageSize) sp.set('pageSize', String(params.pageSize));
   const qs = sp.toString();
-  const res = await api.get(`/api/papers${qs ? `?${qs}` : ''}`);
+  const res = await api.get(`/papers${qs ? `?${qs}` : ''}`);
   return res.data;
 }
 
 export async function getPaperDetail(id: string): Promise<PaperDetail> {
-  const res = await api.get(`/api/papers/${id}`);
+  const res = await api.get(`/papers/${id}`);
   return res.data;
 }
 
 export async function createPaper(data: CreatePaperRequest): Promise<PaperItem> {
-  const res = await api.post('/api/papers', data);
+  const res = await api.post('/papers', data);
   return res.data;
 }
 
 export async function updatePaper(id: string, data: UpdatePaperRequest): Promise<PaperItem> {
-  const res = await api.patch(`/api/papers/${id}`, data);
+  const res = await api.patch(`/papers/${id}`, data);
   return res.data;
 }
 
 export async function deletePaper(id: string): Promise<void> {
-  await api.delete(`/api/papers/${id}`);
+  await api.delete(`/papers/${id}`);
 }
