@@ -60,19 +60,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         },
       };
     } else {
-      // 未知异常. Production: never leak stack/cause/SQL internals to the client.
+      // Unknown/unhandled exception. NEVER leak stack/cause/SQL/path/internal details to the
+      // client — regardless of APP_ENV (staging) or NODE_ENV. Log it server-side for operators.
+      // The previous build only dropped internals when NODE_ENV==='production', so a staging box
+      // (which runs with production-like env) leaked TypeError stack + file paths to the client.
+      // That was the NO-GO: emit a generic message only.
+      // eslint-disable-next-line no-console
+      console.error('[unhandled exception]', exception);
       httpStatus = HttpStatus.INTERNAL_SERVER_ERROR;
-      const isProd = process.env.NODE_ENV === 'production';
       errorResponse = {
         error: {
           code: ResponseCode.INTERNAL_ERROR,
           message: '服务器内部错误',
-          ...(isProd
-            ? {}
-            : {
-                stack: (exception as Error).stack,
-                cause: (exception as Error).cause as string,
-              }),
           timestamp: Date.now(),
         },
       };

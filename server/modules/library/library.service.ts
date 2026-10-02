@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { and, eq, ilike, or, desc, sql } from 'drizzle-orm';
 import { DATABASE, type Database } from '../../database/database.module';
+import { toIsoDate, toIsoDateTime } from '../../common/utils/safe-date';
 import {
   userLibrary,
   userRecommendationFeedback,
@@ -34,7 +35,7 @@ export interface LibraryFilters {
   hasNotes?: boolean;
 }
 
-function mapPaperDetail(p: any, journalName: string | null, fetchedAt: Date | null): PaperDetail {
+function mapPaperDetail(p: any, journalName: string | null, fetchedAt: unknown): PaperDetail {
   return {
     id: p.id,
     journalId: p.journal_id ?? p.journalId ?? null,
@@ -45,15 +46,11 @@ function mapPaperDetail(p: any, journalName: string | null, fetchedAt: Date | nu
     abstractText: p.abstract_text ?? p.abstractText ?? null,
     methods: p.methods,
     conclusions: p.conclusions,
-    publishedDate: p.published_date
-      ? (p.published_date instanceof Date ? p.published_date.toISOString().slice(0, 10) : String(p.published_date).slice(0, 10))
-      : (p.publishedDate ?? null),
+    publishedDate: toIsoDate(p.published_date ?? p.publishedDate),
     url: p.url,
-    createdAt: p._created_at
-      ? (p._created_at instanceof Date ? p._created_at.toISOString() : String(p._created_at))
-      : (p.createdAt ?? ''),
+    createdAt: toIsoDateTime(p._created_at ?? p.createdAt) ?? '',
     journalName,
-    fetchedAt: fetchedAt ? fetchedAt.toISOString() : null,
+    fetchedAt: toIsoDateTime(fetchedAt),
   };
 }
 
@@ -107,7 +104,7 @@ export class LibraryService {
       isFavorite: r.lib.isFavorite,
       readingState: (r.lib.readingState as ReadingState | null) ?? null,
       personalTags: r.lib.personalTags,
-      addedAt: r.lib.addedAt.toISOString(),
+      addedAt: toIsoDateTime(r.lib.addedAt) ?? '',
       paper: r.p
         ? mapPaperDetail(r.p, r.jName, r.p.fetchedAt)
         : null,
@@ -201,7 +198,7 @@ export class LibraryService {
       isFavorite: joined.lib.isFavorite,
       readingState: (joined.lib.readingState as ReadingState | null) ?? null,
       personalTags: joined.lib.personalTags,
-      addedAt: joined.lib.addedAt.toISOString(),
+      addedAt: toIsoDateTime(joined.lib.addedAt) ?? '',
       paper: joined.p ? mapPaperDetail(joined.p, joined.jName, joined.p.fetchedAt) : null,
       noteCount: joined.noteCount,
     };

@@ -204,6 +204,23 @@ async function main() {
     }
     console.log('[ok] recommendations expose matchedKeywords[] + breakdown per item');
 
+    // cold-start path: a brand-new user with no library/notes must get 200, coldStart=true,
+    // and every returned paper must have serializable date fields (no Date.toISOString crash).
+    const coldUname = 'cold_' + Date.now();
+    const coldReg = await call('POST', '/api/auth/register', undefined, { username: coldUname, password: 'password123', email: `${coldUname}@example.com` });
+    const coldToken = coldReg.data.token;
+    const coldReco = await call('GET', '/api/library/recommendations?limit=5', coldToken);
+    if (coldReco.status !== 200) throw new Error('cold-start recommendations -> ' + coldReco.status + ' ' + JSON.stringify(coldReco.data));
+    if (coldReco.data.coldStart !== true) throw new Error('fresh user should be coldStart=true, got ' + coldReco.data.coldStart);
+    for (const it of coldReco.data.items ?? []) {
+      // date fields must be strings or null — never a live Date (which would already have failed JSON).
+      if (it.paper.publishedDate !== null && typeof it.paper.publishedDate !== 'string') throw new Error('publishedDate not serializable: ' + JSON.stringify(it.paper.publishedDate));
+      if (it.paper.fetchedAt !== null && typeof it.paper.fetchedAt !== 'string') throw new Error('fetchedAt not serializable: ' + JSON.stringify(it.paper.fetchedAt));
+      if (!Array.isArray(it.reasons) || !Array.isArray(it.matchedKeywords)) throw new Error('cold-start item missing reasons/matchedKeywords');
+      if (it.paper.journalName === undefined) throw new Error('cold-start item missing journalName field');
+    }
+    console.log('[ok] cold-start fresh user recommendations 200; dates serializable; reasons/matchedKeywords/source present');
+
     // quick unfavorite: favorite a paper then unfavorite with no state/tags -> row deleted
     const favToggle = await call('POST', `/api/library/${otherPaper.id}/favorite`, token, { isFavorite: true });
     if (favToggle.status !== 200) throw new Error('quick favorite on -> ' + favToggle.status);
