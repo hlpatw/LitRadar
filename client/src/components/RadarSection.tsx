@@ -3,18 +3,21 @@ import { toast } from 'sonner';
 import { Star, BookMarked, X, FileText } from 'lucide-react';
 import * as api from '@/api';
 import type { RadarHistoryResponse, RadarTopItem, WeeklyRadarSnapshot } from '@shared/api.interface';
+import { trackImpression, trackDetail, trackLibrary, trackAction } from '@/utils/events';
 
 async function quickAction(paperId: string, action: 'favorite' | 'todo' | 'uninterested') {
   try {
     if (action === 'favorite') {
       await api.library.toggleFavorite(paperId, true);
-      await api.radar.trackEvent({ eventType: 'favorite', paperId });
+      trackAction('favorite', paperId);
+      trackLibrary(paperId); // a favorite creates/extends a library association
     } else if (action === 'todo') {
       await api.library.upsertLibrary(paperId, { readingState: 'todo' });
-      await api.radar.trackEvent({ eventType: 'todo', paperId });
+      trackAction('todo', paperId);
+      trackLibrary(paperId);
     } else {
       await api.library.markUninterested(paperId);
-      await api.radar.trackEvent({ eventType: 'uninterested', paperId });
+      trackAction('uninterested', paperId);
     }
     toast.success('已更新书架');
   } catch (e) {
@@ -77,7 +80,7 @@ export default function RadarSection() {
   const [data, setData] = React.useState<RadarHistoryResponse | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [tab, setTab] = React.useState<'current' | 'previous'>('current');
-  const navigate = (id: string) => { window.location.href = `/papers/${id}`; };
+  const navigate = (id: string) => { trackDetail(id); window.location.href = `/papers/${id}`; };
 
   React.useEffect(() => {
     api.radar.getRadar()
@@ -87,6 +90,12 @@ export default function RadarSection() {
 
   const snapshot: WeeklyRadarSnapshot | null =
     tab === 'current' ? data?.current ?? null : data?.previous ?? null;
+
+  // Fire one impression per rendered item (in-session deduped by the helper).
+  React.useEffect(() => {
+    if (!snapshot) return;
+    for (const it of snapshot.items) trackImpression(it.paper.id, 'radar');
+  }, [snapshot]);
 
   return (
     <section className="mt-10 rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-[22px_24px]">

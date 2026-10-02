@@ -2,6 +2,7 @@ import React from 'react';
 import * as api from '@/api';
 import type { WeeklyDigest, RadarTopItem } from '@shared/api.interface';
 import { FileText, Star, BookMarked, X, Eye, ScrollText } from 'lucide-react';
+import { trackImpression, trackDetail } from '@/utils/events';
 
 const typeLabels: Record<string, string> = {
   impression: '曝光', detail: '详情', library: '加书架', todo: '待读',
@@ -22,6 +23,9 @@ export default function Digest() {
   if (loading) return <p className="mt-10 text-[var(--muted-foreground)]">加载中…</p>;
   if (error) return <p className="mt-10 text-red-600">{error}</p>;
   if (!data) return null;
+
+  // Fire one impression per rendered Top10 row (in-session deduped by the helper).
+  for (const it of data.top10) trackImpression(it.paper.id, 'digest');
 
   return (
     <div>
@@ -99,7 +103,7 @@ export default function Digest() {
         <div className="mt-4 space-y-2">
           {data.top10.length === 0 ? <p className="text-[14.5px] text-[var(--muted-foreground)]">本周暂无 Top10。</p> :
             data.top10.map((it: RadarTopItem) => (
-              <a key={it.paper.id} href={`/papers/${it.paper.id}`} className="block rounded-[8px] border border-[var(--border)] bg-white p-[14px_16px] hover:border-[var(--primary)]">
+              <a key={it.paper.id} href={`/papers/${it.paper.id}`} onClick={() => trackDetail(it.paper.id)} className="block rounded-[8px] border border-[var(--border)] bg-white p-[14px_16px] hover:border-[var(--primary)]">
                 <div className="flex items-center gap-3">
                   <span className="font-serif text-[20px] font-bold text-[var(--primary)] w-6">{it.rank}</span>
                   <div className="min-w-0 flex-1">

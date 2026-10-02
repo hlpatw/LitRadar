@@ -39,6 +39,19 @@ export class EventsService {
     if (!ALLOWED.has(body.eventType)) {
       throw new BadRequestException(`unknown eventType: ${body.eventType}`);
     }
+    // DTO validation: an explicit key, when provided, must be a string of sane length.
+    if (body.idempotencyKey !== undefined && body.idempotencyKey !== null) {
+      if (typeof body.idempotencyKey !== 'string') {
+        throw new BadRequestException('idempotencyKey must be a string');
+      }
+      if (body.idempotencyKey.length > 200) {
+        throw new BadRequestException('idempotencyKey too long (max 200)');
+      }
+    }
+    if (body.paperId !== undefined && body.paperId !== null && typeof body.paperId !== 'string') {
+      throw new BadRequestException('paperId must be a string or null');
+    }
+
     const key = (body.idempotencyKey && body.idempotencyKey.trim())
       ? body.idempotencyKey.trim().slice(0, 200)
       : this.derivedKey(body);

@@ -36,6 +36,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 import { workspace, papers as papersApi } from '@/api';
 import type { NoteItem, PaperItem, CreateNoteRequest, UpdateNoteRequest } from '@shared/api.interface';
+import { trackNote } from '@/utils/events';
 
 function NoteForm({
   open,
@@ -252,6 +253,8 @@ export default function Notes() {
 
   const handleCreate = async (data: CreateNoteRequest): Promise<void> => {
     await workspace.createNote(data);
+    // Note event fires ONLY on successful create; never sends content/tags (only paperId).
+    trackNote(data.paperId ?? null);
     toast.success('笔记已创建');
     await fetchData();
   };

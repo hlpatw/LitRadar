@@ -1,4 +1,4 @@
-// Built-artifact (dist) regression over the full authenticated user journey:
+﻿// Built-artifact (dist) regression over the full authenticated user journey:
 //   register/login -> me -> dashboard -> sources -> papers -> checklist -> notes
 //   -> settings -> version -> runs -> (no token) 401 -> (bad token) 401.
 // Boots embedded Postgres + the compiled Nest app. Safe; touches no production DB.
@@ -534,6 +534,56 @@ async function main() {
     const evSum = await call('GET', '/api/events/admin/summary', adminToken);
     if (evSum.status !== 200 || typeof evSum.data.total !== 'number') throw new Error('event admin summary -> ' + evSum.status);
     console.log('[ok] event admin summary total=' + evSum.data.total);
+
+    // Explicit-key contract: impression <week>:impression:<surface>:<paperId> dedupes on
+    // refresh; detail dedupes per paper/week; library records only the first time; note
+    // fires only on success and carries NO content.
+    const wk = new Date().toISOString().slice(0, 10);
+    const impKey = `${wk}:impression:radar:${adminPaperId}`;
+    const impA = await call('POST', '/api/events', token, { eventType: 'impression', paperId: adminPaperId, idempotencyKey: impKey });
+    const impB = await call('POST', '/api/events', token, { eventType: 'impression', paperId: adminPaperId, idempotencyKey: impKey });
+    if (impA.data.recorded !== true || impB.data.recorded !== false) throw new Error('impression refresh should dedupe');
+    console.log('[ok] impression: render recorded=true, refresh recorded=false');
+
+    const detKey = `${wk}:detail:${adminPaperId}`;
+    const detA = await call('POST', '/api/events', token, { eventType: 'detail', paperId: adminPaperId, idempotencyKey: detKey });
+    const detB = await call('POST', '/api/events', token, { eventType: 'detail', paperId: adminPaperId, idempotencyKey: detKey });
+    if (detA.data.recorded !== true || detB.data.recorded !== false) throw new Error('detail repeat should dedupe');
+    console.log('[ok] detail: first open recorded=true, repeat recorded=false');
+
+    const libKey = `${wk}:library:${adminPaperId}`;
+    const libA = await call('POST', '/api/events', token, { eventType: 'library', paperId: adminPaperId, idempotencyKey: libKey });
+    const libB = await call('POST', '/api/events', token, { eventType: 'library', paperId: adminPaperId, idempotencyKey: libKey });
+    if (libA.data.recorded !== true || libB.data.recorded !== false) throw new Error('library should record first only');
+    console.log('[ok] library: first association recorded=true, pure re-update recorded=false');
+
+    const noteKey = `${wk}:note:${adminPaperId}`;
+    const noteEv = await call('POST', '/api/events', token, { eventType: 'note', paperId: adminPaperId, idempotencyKey: noteKey });
+    if (noteEv.data.recorded !== true) throw new Error('note event should record');
+    const freeNote = await call('POST', '/api/events', token, { eventType: 'note', paperId: null, idempotencyKey: `${wk}:note:none` });
+    if (freeNote.data.recorded !== true) throw new Error('free note (paperId=null) should record');
+    console.log('[ok] note: success recorded, paperId=null free-note allowed, no content sent');
+
+    const badKey = await call('POST', '/api/events', token, { eventType: 'favorite', paperId: adminPaperId, idempotencyKey: 123 });
+    if (badKey.status !== 400) throw new Error('non-string idempotencyKey should 400, got ' + badKey.status);
+    console.log('[ok] event DTO: non-string idempotencyKey rejected 400');
+    // Fire the remaining two action events so all 7 digest categories are covered.
+    await call('POST', '/api/events', token, { eventType: 'todo', paperId: adminPaperId, idempotencyKey: `${wk}:todo:${adminPaperId}` });
+    await call('POST', '/api/events', token, { eventType: 'uninterested', paperId: adminPaperId, idempotencyKey: `${wk}:uninterested:${adminPaperId}` });
+
+    const reg2 = await call('POST', '/api/auth/register', undefined, { username: 'e2e_other_' + Date.now(), password: 'pw123456', email: 'e2e_other_' + Date.now() + '@x.io' });
+    const token2 = reg2.data.token;
+    if (!token2) throw new Error('second user register failed');
+    const otherImp = await call('POST', '/api/events', token2, { eventType: 'impression', paperId: adminPaperId, idempotencyKey: impKey });
+    if (otherImp.data.recorded !== true) throw new Error('second user must record independently (isolation broken)');
+    console.log('[ok] dual-user isolation: same key records for a different user');
+
+    const digest2 = await call('GET', '/api/digest/current', token);
+    const counts = digest2.data.userActionCounts;
+    for (const k of ['impression', 'detail', 'library', 'todo', 'favorite', 'uninterested', 'note']) {
+      if (typeof counts[k] !== 'number' || counts[k] < 1) throw new Error('digest action ' + k + ' should be >=1, got ' + JSON.stringify(counts));
+    }
+    console.log('[ok] digest 7 action counts all grew:', JSON.stringify(counts));
 
     // ── (G) NOTES TAGS ───────────────────────────────────────────────────────
     const taggedNote = await call('POST', '/api/workspace/notes', token, { content: 'note with tags', tags: ['priming', 'syntax'] });

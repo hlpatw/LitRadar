@@ -38,7 +38,9 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        // Explicit opacity transition (not animate-in defaults, which may not be generated
+        // if the plugin is absent) so the backdrop always fades in/out reliably.
+        "data-[state=open]:opacity-100 data-[state=closed]:opacity-0 fixed inset-0 z-50 bg-black/50 transition-opacity duration-200",
         className
       )}
       {...props}
@@ -63,8 +65,10 @@ function DialogContent({
           // Responsive shared-modal standard: a flex column capped at 85vh so it never
           // overflows small/zoomed viewports. The header + sticky footer stay put while
           // <DialogBody> scrolls internally. Width: full-bleed on mobile (375), fixed max
-          // at >=768. Radix provides focus-trap + ESC-to-close automatically.
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 flex w-[calc(100vw-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] flex-col gap-4 rounded-lg border bg-white p-6 shadow-lg duration-200 max-h-[85dvh] sm:w-full",
+          // at >=768. Radix provides focus-trap + ESC-to-close + return-focus automatically.
+          // Explicit opacity+scale (NOT animate-in defaults) so the dialog is reliably
+          // visible on open and animates closed.
+          "bg-background data-[state=open]:opacity-100 data-[state=open]:scale-100 data-[state=closed]:opacity-0 data-[state=closed]:scale-95 fixed top-[50%] left-[50%] z-50 flex w-[calc(100vw-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] flex-col gap-4 rounded-lg border bg-white p-6 shadow-lg transition-all duration-200 max-h-[85dvh] sm:w-full",
           className
         )}
         {...props}
