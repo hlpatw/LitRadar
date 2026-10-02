@@ -56,6 +56,12 @@ const priorityColor: Record<string, string> = {
 
 const STATE_LABEL: Record<string, string> = { todo: '待读', reading: '阅读中', read: '已读' };
 
+/** Surface the server's human message regardless of which Nest error shape came back. */
+function errMsg(e: any, fallback: string): string {
+  const d = e?.response?.data;
+  return d?.message || d?.error?.message || d?.error || fallback;
+}
+
 function paperActionsDisabledReason(s: SourceDetailType): string | null {
   if (s.connectorStatus === 'skeleton') return '连接器尚未实现，该来源暂无在线抓取';
   if (s.connectorStatus === 'disabled') return '连接器已停用';
@@ -86,7 +92,7 @@ export default function SourceDetail() {
   const fetchDetail = useCallback(() => {
     return getSourceDetail(sourceId)
       .then(setDetail)
-      .catch((e) => setError(e?.response?.data?.message || '加载来源失败'));
+      .catch((e) => setError(errMsg(e, '加载来源失败')));
   }, [sourceId]);
 
   const fetchPapers = useCallback(() => {
@@ -107,7 +113,7 @@ export default function SourceDetail() {
         setTotal(res.total);
         setDetail(res.source);
       })
-      .catch((e) => setError(e?.response?.data?.message || '加载论文失败'))
+      .catch((e) => setError(errMsg(e, '加载论文失败')))
       .finally(() => setLoading(false));
   }, [sourceId, search, from, to, hasAbstract, notInLibrary, order, page]);
 
@@ -136,8 +142,8 @@ export default function SourceDetail() {
           : '已加入待读',
       );
       fetchPapers();
-    } catch {
-      toast.error('操作失败');
+    } catch (e: any) {
+      toast.error(errMsg(e, '操作失败'));
     } finally {
       setBusyPaper(null);
     }
@@ -147,8 +153,8 @@ export default function SourceDetail() {
     try {
       await libraryApi.toggleFavorite(paper.id, !paper.isFavorite);
       fetchPapers();
-    } catch {
-      toast.error('操作失败');
+    } catch (e: any) {
+      toast.error(errMsg(e, '操作失败'));
     }
   };
 

@@ -21,6 +21,12 @@ const statusBadge: Record<string, string> = {
   disabled: 'bg-gray-200 text-gray-600',
 };
 
+/** Surface the server's human message regardless of which Nest error shape came back. */
+function errMsg(e: any, fallback: string): string {
+  const d = e?.response?.data;
+  return d?.message || d?.error?.message || d?.error || fallback;
+}
+
 function disabledReason(s: SourceRow): string | null {
   if (s.connectorStatus === 'skeleton') return '连接器尚未实现';
   if (s.connectorStatus === 'disabled') return '连接器已停用';
@@ -75,7 +81,7 @@ export default function AdminSources() {
       toast.success(`${s.name}: 新增 ${out.inserted} / 更新 ${out.updated}`);
       await Promise.all([load(), loadRuns(s.id)]);
     } catch (e: any) {
-      toast.error(e?.response?.data?.message || '同步失败');
+      toast.error(errMsg(e, '同步失败'));
     } finally {
       setSyncing((p) => ({ ...p, [s.id]: false }));
     }
@@ -88,7 +94,7 @@ export default function AdminSources() {
       toast.success(`${s.name}: 已重试`);
       await Promise.all([load(), loadRuns(s.id)]);
     } catch (e: any) {
-      toast.error(e?.response?.data?.message || '重试失败');
+      toast.error(errMsg(e, '重试失败'));
     } finally {
       setSyncing((p) => ({ ...p, [s.id]: false }));
     }

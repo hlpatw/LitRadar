@@ -105,7 +105,7 @@ export class SourcesService {
         aliases: sql<string[]>`COALESCE((SELECT json_agg(a.alias_name) FROM source_aliases a WHERE a.source_id = journals.id), '[]')`,
         // Latest TERMINAL run (ok/error) for header bookkeeping. A still-running run is NOT
         // folded in here; it is surfaced separately via runningRun.
-        lastRun: sql<any[]>`(SELECT json_build_object(
+        lastRun: sql<any>`(SELECT json_build_object(
           'status', s.status,
           'inserted', s.inserted_count,
           'updated', s.updated_count,
@@ -113,7 +113,7 @@ export class SourcesService {
         ) FROM source_sync_runs s
           WHERE s.source_id = journals.id AND s.status IN ('ok','error')
           ORDER BY s.started_at DESC LIMIT 1)`,
-        runningRun: sql<any[]>`(SELECT json_build_object(
+        runningRun: sql<any>`(SELECT json_build_object(
           'id', s.id,
           'startedAt', s.started_at
         ) FROM source_sync_runs s
@@ -126,8 +126,9 @@ export class SourcesService {
 
     if (rows.length === 0) throw new NotFoundException('来源不存在');
     const r = rows[0];
-    const lastRun = (r.lastRun && r.lastRun[0]) || null;
-    const running = (r.runningRun && r.runningRun[0]) || null;
+    // json_build_object scalar subquery already deserializes to a plain object (or null).
+    const lastRun = r.lastRun || null;
+    const running = r.runningRun || null;
 
     return {
       id: r.j.id,

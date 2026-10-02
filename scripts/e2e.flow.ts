@@ -320,6 +320,9 @@ async function main() {
     if (detail.data.id !== readySource.id || typeof detail.data.paperCount !== 'number')
       throw new Error('source detail missing header/counts: ' + JSON.stringify(detail.data));
     if (!Array.isArray(detail.data.aliases)) throw new Error('source detail missing aliases');
+    // Before any run: lastRun* should be null and runningRun null.
+    if (detail.data.lastRunStatus !== null || detail.data.runningRun !== null)
+      throw new Error('fresh source should have null lastRunStatus/runningRun: ' + JSON.stringify(detail.data));
     console.log('[ok] GET /api/sources/:id ->', detail.data.name, 'papers=' + detail.data.paperCount, 'runningRun=' + JSON.stringify(detail.data.runningRun));
 
     // bad uuid -> 400
@@ -383,42 +386,78 @@ async function main() {
       console.log('[ok] admin sync on skeleton/disabled source -> 400:', badSync.data.message);
     }
 
-    // running protection: plant a FRESH running row, then fire TWO concurrent admin sync
-    // requests. The atomic guard (advisory xact lock + partial unique index) must reject BOTH
-    // (409) and must NOT create a second running row.
+    // atomic per-source running guard: fire TWO concurrent admin syncs with NO planted row.
+    // The advisory xact lock serializes claim+insert of the running row: one caller wins and
+    // proceeds to fetch; the other blocks on the lock, sees the committed running row -> 409.
+    // By the time both HTTP responses return the winner's run is already terminal (released).
     {
       const { Client: PgClient } = await import('pg');
       const dbc = new PgClient({ connectionString: conn });
       await dbc.connect();
-      await dbc.query(
-        `INSERT INTO source_sync_runs (id, source_id, connector_type, status, started_at, fetched_count, inserted_count, updated_count, message)
-         VALUES (gen_random_uuid(), $1, 'crossref', 'running', now(), 0, 0, 0, 'planted for e2e')`,
-        [readySource.id],
-      );
-      const before = (await dbc.query(`SELECT count(*)::int AS n FROM source_sync_runs WHERE source_id=$1 AND status='running'`, [readySource.id])).rows[0].n;
+      // ensure a clean slate
+      await dbc.query(`UPDATE source_sync_runs SET status='error' WHERE source_id=$1 AND status='running'`, [readySource.id]);
+      const baseline = (await dbc.query(`SELECT count(*)::int AS n FROM source_sync_runs WHERE source_id=$1 AND status='running'`, [readySource.id])).rows[0].n;
       await dbc.end();
 
       const [r1, r2] = await Promise.all([
         call('POST', `/api/admin/sources/${readySource.id}/sync`, adminToken),
         call('POST', `/api/admin/sources/${readySource.id}/sync`, adminToken),
       ]);
-      if (r1.status !== 409 || r2.status !== 409)
-        throw new Error(`concurrent syncs should both 409, got ${r1.status} / ${r2.status}`);
+      const fourOhNines = [r1.status, r2.status].filter((s: number) => s === 409).length;
+      if (fourOhNines !== 1)
+        throw new Error(`exactly one concurrent sync should 409, got ${r1.status} / ${r2.status}`);
+      const winner = [r1.status, r2.status].find((s: number) => s !== 409)!;
+      if (![200, 500, 502].includes(winner))
+        throw new Error(`winner should enter/finish sync (200/5xx), got ${winner}`);
 
       const dbc2 = new PgClient({ connectionString: conn });
       await dbc2.connect();
       const after = (await dbc2.query(`SELECT count(*)::int AS n FROM source_sync_runs WHERE source_id=$1 AND status='running'`, [readySource.id])).rows[0].n;
       await dbc2.end();
-      if (before !== 1 || after !== 1) throw new Error(`running row count must stay 1, before=${before} after=${after}`);
-      console.log('[ok] concurrent admin syncs both 409; running rows stay exactly 1 (atomic guard)');
+      if (after !== 0) throw new Error(`after settle there must be no running row, got ${after}`);
+      if (baseline !== 0) throw new Error('unexpected pre-existing running row');
+      console.log(`[ok] concurrent sync: one enters (${winner}) / one 409; running released, rows=0 (atomic lock+unique index)`);
     }
 
-    // per-source runs list (admin) returns full fields
+    // stale running row is reaped (marked error/interrupted) and a fresh sync is allowed (not 409)
+    {
+      const { Client: PgClient } = await import('pg');
+      const dbc = new PgClient({ connectionString: conn });
+      await dbc.connect();
+      await dbc.query(
+        `INSERT INTO source_sync_runs (id, source_id, connector_type, status, started_at, finished_at, fetched_count, inserted_count, updated_count, message)
+         VALUES (gen_random_uuid(), $1, 'crossref', 'running', now() - interval '20 minutes', null, 0, 0, 0, 'planted stale')`,
+        [readySource.id],
+      );
+      await dbc.end();
+
+      const retry = await call('POST', `/api/admin/sources/${readySource.id}/sync`, adminToken);
+      if (retry.status === 409)
+        throw new Error('stale running row should be reaped, fresh sync must NOT 409');
+      console.log('[ok] stale running row reaped as error/interrupted; retry allowed (status=' + retry.status + ')');
+    }
+
+    // per-source runs list (admin) returns full fields; at least one terminal run exists now
     const srcRuns = await call('GET', `/api/admin/sources/${readySource.id}/runs`, adminToken);
     if (srcRuns.status !== 200 || !Array.isArray(srcRuns.data)) throw new Error('admin source runs -> ' + srcRuns.status);
-    const planted = srcRuns.data.find((r: any) => r.status === 'running');
-    if (!planted || typeof planted.startedAt !== 'string') throw new Error('admin source runs missing full run fields');
+    const terminalRun = srcRuns.data.find((r: any) => r.status === 'ok' || r.status === 'error');
+    if (!terminalRun || typeof terminalRun.startedAt !== 'string' || terminalRun.fetchedCount === undefined)
+      throw new Error('admin source runs missing full terminal run fields: ' + JSON.stringify(srcRuns.data[0]));
     console.log('[ok] GET /api/admin/sources/:id/runs ->', srcRuns.data.length, 'runs with full fields');
+
+    // detail now reflects the terminal lastRun (json_build_object unwrapped as object, not [0])
+    const detailAfter = await call('GET', `/api/sources/${readySource.id}`, token);
+    if (detailAfter.status !== 200) throw new Error('source detail after runs -> ' + detailAfter.status);
+    if (detailAfter.data.lastRunStatus !== 'ok' && detailAfter.data.lastRunStatus !== 'error')
+      throw new Error('detail lastRunStatus should be a terminal status, got ' + detailAfter.data.lastRunStatus);
+    if (typeof detailAfter.data.lastRunInserted !== 'number' || typeof detailAfter.data.lastRunUpdated !== 'number')
+      throw new Error('detail lastRunInserted/Updated missing: ' + JSON.stringify(detailAfter.data));
+    if (typeof detailAfter.data.lastRunStartedAt !== 'string')
+      throw new Error('detail lastRunStartedAt should be an ISO string');
+    if (detailAfter.data.runningRun !== null)
+      throw new Error('no run should be running now, got runningRun=' + JSON.stringify(detailAfter.data.runningRun));
+    console.log('[ok] source detail terminal lastRun fields populated; runningRun=null:',
+      JSON.stringify({ status: detailAfter.data.lastRunStatus, ins: detailAfter.data.lastRunInserted, upd: detailAfter.data.lastRunUpdated }));
 
     console.log('\n=== E2E FLOW REGRESSION PASSED ===');
   } finally {
