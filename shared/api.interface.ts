@@ -71,6 +71,7 @@ export interface DashboardStats {
   favoriteCount: number;
   checklistTodoCount: number;
   checklistDoneCount: number;
+  readingCount: number;
   noteCount: number;
 }
 
@@ -224,4 +225,51 @@ export interface RecommendationResponse {
   coldStart: boolean;
   weights: RecWeights;
   excluded: { library: number; uninterested: number };
+}
+
+// ── Source detail (user-facing /sources/:sourceId) ───────────────────────────
+
+export interface SourceDetail {
+  id: string;
+  parentId: string | null;
+  name: string;
+  abbreviation: string | null;
+  sourceType: string;
+  priority: string;
+  category: string | null;
+  description: string | null;
+  url: string | null;
+  issn: string | null;
+  externalId: string | null;
+  status: 'active' | 'archived' | string;
+  connectorType: string | null;
+  connectorStatus: 'ready' | 'skeleton' | 'disabled' | string;
+  pollPolicy: string | null;
+  updateFrequency: string | null;
+  lastSyncedAt: string | null;
+  // Latest TERMINAL sync run (ok/error) — the header default. A currently-running run is
+  // surfaced separately so it never overwrites the last-good bookkeeping.
+  lastRunStatus: string | null;
+  lastRunInserted: number | null;
+  lastRunUpdated: number | null;
+  lastRunStartedAt: string | null;
+  runningRun: { id: string; startedAt: string } | null;
+  // Counts.
+  paperCount: number;
+  childCount: number;
+  aliasCount: number;
+  aliases: string[];
+}
+
+// A paper row on a source detail page, enriched with the current user's library state so the
+// row can render favorite / reading-state actions without a second round-trip.
+export interface SourcePaperItem extends PaperItem {
+  journalName: string | null;
+  inLibrary: boolean;
+  isFavorite: boolean;
+  readingState: ReadingState | null;
+}
+
+export interface SourcePaperListResponse extends PaginatedResponse<SourcePaperItem> {
+  source: SourceDetail;
 }

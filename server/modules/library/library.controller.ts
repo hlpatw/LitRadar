@@ -98,7 +98,8 @@ export class LibraryController {
     @Body() body: { state: 'todo' | 'reading' | 'read' | null },
   ): Promise<LibraryItem> {
     const userId = getAuthenticatedUserId(req);
-    return this.libraryService.upsert(userId, paperId, { readingState: body.state });
+    // Explicit state selector: honor the user's choice verbatim (may regress).
+    return this.libraryService.upsert(userId, paperId, { readingState: body.state }, { explicitState: true });
   }
 
   @Post(':paperId/feedback')

@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/auth.guard';
 import { CrossrefConnector } from './crossref.connector';
 import { IngestionService, SyncOutcome, SyncRunRow } from './ingestion.service';
 import { isCrossrefReady } from '../sources/mvp.sources';
+import { AdminSourcesController } from './admin-sources.controller';
 
 @Controller('api/connectors')
 export class ConnectorsController {
@@ -42,7 +43,7 @@ export class ConnectorsController {
 }
 
 @Module({
-  controllers: [ConnectorsController],
+  controllers: [ConnectorsController, AdminSourcesController],
   providers: [CrossrefConnector, IngestionService],
   exports: [IngestionService],
 })

@@ -5,32 +5,34 @@ import {
   Library,
   Radio,
   FileText,
-  CheckSquare,
   StickyNote,
   Settings,
   ChevronLeft,
   ChevronRight,
   LogOut,
   BookMarked,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
-const navItems = [
+const baseNavItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/sources', label: '追踪来源', icon: Radio },
   { path: '/journals', label: '期刊与会议', icon: Library },
   { path: '/papers', label: '论文浏览', icon: FileText },
   { path: '/library', label: '我的书架', icon: BookMarked },
-  { path: '/checklist', label: '阅读清单', icon: CheckSquare },
   { path: '/notes', label: '笔记', icon: StickyNote },
   { path: '/settings', label: '设置', icon: Settings },
 ];
+
+const adminNavItem = { path: '/admin/sources', label: '来源管理', icon: ShieldCheck };
 
 const Layout = () => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const navItems = user?.isAdmin ? [...baseNavItems, adminNavItem] : baseNavItems;
 
   const handleLogout = () => {
     logout();

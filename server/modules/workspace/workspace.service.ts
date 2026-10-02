@@ -76,6 +76,20 @@ function fromLegacyStatus(s: string | null | undefined): ReadingState {
   return 'todo';
 }
 
+// Reading-state ranking for the non-regression rule: a legacy checklist compat write must
+// NEVER silently downgrade a more-advanced state (read > reading > todo). The new Library
+// quick-actions are explicit user intent and are untouched; this guard applies only to the
+// legacy checklist API writes routed into user_library.
+const STATE_RANK: Record<string, number> = { todo: 1, reading: 2, read: 3 };
+function preservesMoreAdvanced(incoming: ReadingState) {
+  return sql`CASE
+    WHEN ${userLibrary.readingState} = 'read' THEN 'read'
+    WHEN ${userLibrary.readingState} = 'reading' THEN (CASE WHEN ${incoming} = 'read' THEN 'read' ELSE 'reading' END)
+    WHEN ${userLibrary.readingState} = 'todo' THEN (CASE WHEN ${incoming} IN ('reading','read') THEN ${incoming} ELSE 'todo' END)
+    ELSE ${incoming}
+  END`;
+}
+
 @Injectable()
 export class WorkspaceService {
   constructor(
@@ -90,6 +104,7 @@ export class WorkspaceService {
       paperResult,
       favoriteResult,
       todoResult,
+      readingResult,
       doneResult,
       noteResult,
     ] = await Promise.all([
@@ -102,21 +117,15 @@ export class WorkspaceService {
       this.db
         .select({ count: count() })
         .from(userLibrary)
-        .where(
-          and(
-            eq(userLibrary.userId, userId),
-            eq(userLibrary.readingState, 'todo'),
-          ),
-        ),
+        .where(and(eq(userLibrary.userId, userId), eq(userLibrary.readingState, 'todo'))),
       this.db
         .select({ count: count() })
         .from(userLibrary)
-        .where(
-          and(
-            eq(userLibrary.userId, userId),
-            eq(userLibrary.readingState, 'read'),
-          ),
-        ),
+        .where(and(eq(userLibrary.userId, userId), eq(userLibrary.readingState, 'reading'))),
+      this.db
+        .select({ count: count() })
+        .from(userLibrary)
+        .where(and(eq(userLibrary.userId, userId), eq(userLibrary.readingState, 'read'))),
       this.db
         .select({ count: count() })
         .from(userNotes)
@@ -129,6 +138,7 @@ export class WorkspaceService {
       favoriteCount: favoriteResult[0].count,
       checklistTodoCount: todoResult[0].count,
       checklistDoneCount: doneResult[0].count,
+      readingCount: readingResult[0].count,
       noteCount: noteResult[0].count,
     };
   }
@@ -341,7 +351,7 @@ export class WorkspaceService {
         })
         .onConflictDoUpdate({
           target: [userLibrary.userId, userLibrary.paperId],
-          set: { readingState: state, updatedAt: new Date(), updatedBy: userId },
+          set: { readingState: preservesMoreAdvanced(state) as any, updatedAt: new Date(), updatedBy: userId },
         })
         .returning();
 
@@ -394,7 +404,10 @@ export class WorkspaceService {
 
     if (libRow) {
       const patch: Record<string, unknown> = {};
-      if (dto.status !== undefined) patch.readingState = fromLegacyStatus(dto.status);
+      if (dto.status !== undefined) {
+        // Non-regression: never silently downgrade a more-advanced reading state.
+        patch.readingState = preservesMoreAdvanced(fromLegacyStatus(dto.status)) as any;
+      }
       if (Object.keys(patch).length === 0) {
         throw new BadRequestException('未提供可更新字段');
       }
@@ -447,7 +460,7 @@ export class WorkspaceService {
         })
         .onConflictDoUpdate({
           target: [userLibrary.userId, userLibrary.paperId],
-          set: { readingState: state, updatedAt: new Date(), updatedBy: userId },
+          set: { readingState: preservesMoreAdvanced(state) as any, updatedAt: new Date(), updatedBy: userId },
         })
         .returning();
 

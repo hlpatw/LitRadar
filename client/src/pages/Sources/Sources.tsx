@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getSources, type SourceRow } from '../../api/sources';
-import { syncSource, syncAllReady, getSyncRuns, type SyncRunRow } from '../../api/connectors';
-import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
+import { getSyncRuns, type SyncRunRow } from '../../api/connectors';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const priorityColor: Record<string, string> = {
   P0: 'bg-red-100 text-red-700',
@@ -28,10 +28,6 @@ export default function Sources() {
   const [runs, setRuns] = useState<SyncRunRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [syncingIssn, setSyncingIssn] = useState<string | null>(null);
-  const [syncingAll, setSyncingAll] = useState(false);
-  const { user } = useAuth();
-  const isAdmin = !!user?.isAdmin;
 
   const load = useCallback(() => {
     return Promise.all([
@@ -46,55 +42,25 @@ export default function Sources() {
     load();
   }, [load]);
 
-  const handleSyncOne = async (issn: string) => {
-    setSyncingIssn(issn);
-    try {
-      const out = await syncSource(issn);
-      toast.success(`已同步 ${out.sourceName}：新增 ${out.inserted} / 更新 ${out.updated}`);
-      await load();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || '同步失败（需要管理员权限）');
-    } finally {
-      setSyncingIssn(null);
-    }
-  };
-
-  const handleSyncAll = async () => {
-    setSyncingAll(true);
-    try {
-      const outs = await syncAllReady();
-      toast.success(`完成 ${outs.length}/7 个来源同步`);
-      await load();
-    } catch (e: any) {
-      toast.error(e?.response?.data?.message || '批量同步失败（需要管理员权限）');
-    } finally {
-      setSyncingAll(false);
-    }
-  };
-
-  if (loading) return <p className="text-muted-foreground">加载中…</p>;
+  if (loading) {
+    return (
+      <div>
+        <Skeleton className="mb-4 h-7 w-48" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
   if (error) return <p className="text-red-600">{error}</p>;
 
   const ready = rows.filter((r) => r.connectorStatus === 'ready').length;
 
   return (
     <div>
-      <div className="mb-4 flex items-baseline justify-between">
-        <div>
-          <h1 className="font-serif text-xl font-bold">追踪来源</h1>
-          <span className="text-sm text-muted-foreground">
-            共 {rows.length} 个 · 已就绪连接器 {ready} · 骨架/未实现 {rows.length - ready}
-          </span>
-        </div>
-        {isAdmin && (
-          <button
-            onClick={handleSyncAll}
-            disabled={syncingAll}
-            className="rounded-md bg-[var(--primary)] px-3 py-1.5 text-sm text-white disabled:opacity-50"
-          >
-            {syncingAll ? '同步中…' : '手动同步全部'}
-          </button>
-        )}
+      <div className="mb-4">
+        <h1 className="font-serif text-xl font-bold">追踪来源</h1>
+        <span className="text-sm text-muted-foreground">
+          共 {rows.length} 个 · 已就绪连接器 {ready} · 骨架/未实现 {rows.length - ready}
+        </span>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
@@ -109,7 +75,6 @@ export default function Sources() {
               <th className="px-3 py-2 font-medium">状态</th>
               <th className="px-3 py-2 font-medium">轮询</th>
               <th className="px-3 py-2 font-medium">最近同步</th>
-              <th className="px-3 py-2 font-medium">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -124,7 +89,9 @@ export default function Sources() {
                   </span>
                 </td>
                 <td className="px-3 py-2">
-                  <div className="font-medium">{r.name}</div>
+                  <Link to={`/sources/${r.id}`} className="font-medium text-[var(--primary)] hover:underline">
+                    {r.name}
+                  </Link>
                   {r.status === 'archived' && (
                     <div className="text-xs text-muted-foreground">已归档</div>
                   )}
@@ -143,19 +110,6 @@ export default function Sources() {
                 <td className="px-3 py-2 text-xs text-muted-foreground">
                   {r.lastSyncedAt ? new Date(r.lastSyncedAt).toLocaleDateString() : '—'}
                   {r.lastRunStatus ? ` (${r.lastRunStatus})` : ''}
-                </td>
-                <td className="px-3 py-2">
-                  {isAdmin && r.connectorStatus === 'ready' && r.issn ? (
-                    <button
-                      onClick={() => handleSyncOne(r.issn!)}
-                      disabled={syncingIssn === r.issn}
-                      className="rounded border border-[var(--border)] px-2 py-0.5 text-xs hover:bg-[var(--accent)] disabled:opacity-50"
-                    >
-                      {syncingIssn === r.issn ? '…' : '同步'}
-                    </button>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  )}
                 </td>
               </tr>
             ))}

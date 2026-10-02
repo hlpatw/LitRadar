@@ -39,3 +39,20 @@ export async function getSyncRuns(limit = 50): Promise<SyncRunRow[]> {
   const res = await api.get('/connectors/runs', { params: { limit } });
   return res.data;
 }
+
+// ── Admin Source Management (single-source sync only; no batch) ──────────────
+
+export async function adminSyncSource(sourceId: string): Promise<SyncOutcome> {
+  const res = await api.post(`/admin/sources/${sourceId}/sync`);
+  return res.data;
+}
+
+export async function adminRetrySource(sourceId: string): Promise<SyncOutcome> {
+  const res = await api.post(`/admin/sources/${sourceId}/retry`);
+  return res.data;
+}
+
+export async function adminGetSourceRuns(sourceId: string): Promise<SyncRunRow[]> {
+  const res = await api.get(`/admin/sources/${sourceId}/runs`);
+  return res.data;
+}

@@ -33,7 +33,7 @@ async function main() {
   const { Client } = await import('pg');
   const boot = new Client({ connectionString: conn });
   await boot.connect();
-  for (const m of ['0000_base.up.sql', '0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql', '0005_user_library.up.sql']) {
+  for (const m of ['0000_base.up.sql', '0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql', '0005_user_library.up.sql', '0006_source_detail_indexes.up.sql']) {
     await boot.query(f(join(migDir, m)));
   }
   await boot.end();
@@ -311,6 +311,100 @@ async function main() {
     const adminDel = await call('DELETE', `/api/papers/${adminPaperId}`, adminToken);
     if (adminDel.status !== 204 && adminDel.status !== 200) throw new Error('admin DELETE expected 204, got ' + adminDel.status);
     console.log('[ok] admin DELETE /api/papers/:id -> ' + adminDel.status);
+
+    // ── (A) SOURCE DETAIL ────────────────────────────────────────────────────
+    const readySource = src.data.find((s: any) => s.connectorStatus === 'ready' && s.issn);
+    if (!readySource) throw new Error('no ready source to exercise detail');
+    const detail = await call('GET', `/api/sources/${readySource.id}`, token);
+    if (detail.status !== 200) throw new Error('source detail -> ' + detail.status + ' ' + JSON.stringify(detail.data));
+    if (detail.data.id !== readySource.id || typeof detail.data.paperCount !== 'number')
+      throw new Error('source detail missing header/counts: ' + JSON.stringify(detail.data));
+    if (!Array.isArray(detail.data.aliases)) throw new Error('source detail missing aliases');
+    console.log('[ok] GET /api/sources/:id ->', detail.data.name, 'papers=' + detail.data.paperCount, 'runningRun=' + JSON.stringify(detail.data.runningRun));
+
+    // bad uuid -> 400
+    const badSrc = await call('GET', '/api/sources/not-a-uuid', token);
+    if (badSrc.status !== 400) throw new Error('source detail bad uuid expected 400, got ' + badSrc.status);
+    // unknown uuid -> 404
+    const missingSrc = await call('GET', '/api/sources/00000000-0000-4000-8000-000000000000', token);
+    if (missingSrc.status !== 404) throw new Error('source detail missing expected 404, got ' + missingSrc.status);
+    console.log('[ok] source detail bad-uuid 400 / missing 404');
+
+    // paper list scoped strictly to journal_id; filters + ordering
+    const sp = await call('GET', `/api/sources/${readySource.id}/papers?page=1&pageSize=5&order=latest`, token);
+    if (sp.status !== 200) throw new Error('source papers -> ' + sp.status + ' ' + JSON.stringify(sp.data));
+    if (!Array.isArray(sp.data.items) || typeof sp.data.total !== 'number') throw new Error('source papers shape');
+    for (const it of sp.data.items) {
+      if (it.journalId !== readySource.id) throw new Error('source papers not strictly scoped to journal_id');
+      if (typeof it.inLibrary !== 'boolean') throw new Error('source paper missing inLibrary flag');
+    }
+    const spRec = await call('GET', `/api/sources/${readySource.id}/papers?order=recommend`, token);
+    if (spRec.status !== 200) throw new Error('source papers recommend -> ' + spRec.status);
+    console.log('[ok] GET /api/sources/:id/papers strict journal_id scope; latest+recommend order');
+
+    // not-in-library exact filter
+    const spNil = await call('GET', `/api/sources/${readySource.id}/papers?notInLibrary=1`, token);
+    if (spNil.status !== 200) throw new Error('source papers notInLibrary -> ' + spNil.status);
+    for (const it of spNil.data.items) if (it.inLibrary) throw new Error('notInLibrary filter leaked an in-library paper');
+    console.log('[ok] source papers notInLibrary=1 exact');
+
+    // ── (B) NON-DOWNGRADE quick intent ──────────────────────────────────────
+    // Quick upsert (PUT) sets todo on an already-reading/read paper and must NOT downgrade.
+    const ndPaper = await call('POST', '/api/papers', adminLibToken, { title: 'Non-downgrade paper', keywords: 'bias', url: 'https://example.org/nd' });
+    const ndId = ndPaper.data.id;
+    await call('PUT', `/api/library/${ndId}`, token, { readingState: 'read' }); // explicit-ish via PUT quick
+    const quickAgain = await call('PUT', `/api/library/${ndId}`, token, { readingState: 'todo' });
+    if (quickAgain.data.readingState !== 'read') throw new Error('quick todo silently downgraded read->' + quickAgain.data.readingState);
+    console.log('[ok] quick add-todo preserves read (no silent downgrade) ->', quickAgain.data.readingState);
+    // Explicit selector CAN regress: POST /reading-state honors the choice.
+    const explicitBack = await call('POST', `/api/library/${ndId}/reading-state`, token, { state: 'todo' });
+    if (explicitBack.data.readingState !== 'todo') throw new Error('explicit state selector should regress to todo, got ' + explicitBack.data.readingState);
+    console.log('[ok] explicit reading-state selector may regress ->', explicitBack.data.readingState);
+    await call('DELETE', `/api/library/${ndId}`, token);
+
+    // dashboard now also reports readingCount
+    const dash2 = await call('GET', '/api/workspace/dashboard', token);
+    if (typeof dash2.data.readingCount !== 'number') throw new Error('dashboard missing readingCount');
+    console.log('[ok] dashboard readingCount =', dash2.data.readingCount);
+
+    // ── (C) ADMIN SOURCE MANAGEMENT ──────────────────────────────────────────
+    // ordinary user -> 403
+    const adminSyncForbidden = await call('POST', `/api/admin/sources/${readySource.id}/sync`, token);
+    if (adminSyncForbidden.status !== 403) throw new Error('non-admin admin sync expected 403, got ' + adminSyncForbidden.status);
+    const adminRunsForbidden = await call('GET', `/api/admin/sources/${readySource.id}/runs`, token);
+    if (adminRunsForbidden.status !== 403) throw new Error('non-admin admin runs expected 403, got ' + adminRunsForbidden.status);
+    console.log('[ok] admin source API: ordinary user -> 403');
+
+    // admin sync on a skeleton/disabled source -> 400 (no network)
+    const skeleton = src.data.find((s: any) => s.connectorStatus !== 'ready');
+    if (skeleton) {
+      const badSync = await call('POST', `/api/admin/sources/${skeleton.id}/sync`, adminToken);
+      if (badSync.status !== 400) throw new Error('admin sync on skeleton expected 400, got ' + badSync.status + ' ' + JSON.stringify(badSync.data));
+      console.log('[ok] admin sync on skeleton/disabled source -> 400:', badSync.data.message);
+    }
+
+    // running protection: plant a 'running' run row, then admin sync -> 409
+    {
+      const { Client: PgClient } = await import('pg');
+      const dbc = new PgClient({ connectionString: conn });
+      await dbc.connect();
+      await dbc.query(
+        `INSERT INTO source_sync_runs (id, source_id, connector_type, status, started_at, fetched_count, inserted_count, updated_count, message)
+         VALUES (gen_random_uuid(), $1, 'crossref', 'running', now(), 0, 0, 0, 'planted for e2e')`,
+        [readySource.id],
+      );
+      await dbc.end();
+      const conflict = await call('POST', `/api/admin/sources/${readySource.id}/sync`, adminToken);
+      if (conflict.status !== 409) throw new Error('admin sync with running run expected 409, got ' + conflict.status + ' ' + JSON.stringify(conflict.data));
+      console.log('[ok] admin sync while a run is running -> 409 (running protection)');
+    }
+
+    // per-source runs list (admin) returns full fields
+    const srcRuns = await call('GET', `/api/admin/sources/${readySource.id}/runs`, adminToken);
+    if (srcRuns.status !== 200 || !Array.isArray(srcRuns.data)) throw new Error('admin source runs -> ' + srcRuns.status);
+    const planted = srcRuns.data.find((r: any) => r.status === 'running');
+    if (!planted || typeof planted.startedAt !== 'string') throw new Error('admin source runs missing full run fields');
+    console.log('[ok] GET /api/admin/sources/:id/runs ->', srcRuns.data.length, 'runs with full fields');
 
     console.log('\n=== E2E FLOW REGRESSION PASSED ===');
   } finally {

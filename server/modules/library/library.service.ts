@@ -54,6 +54,18 @@ function mapPaperDetail(p: any, journalName: string | null, fetchedAt: unknown):
   };
 }
 
+// Non-downgrade rule for QUICK add-to-list intents: keep the more advanced of existing vs
+// incoming reading_state (read > reading > todo). Used by the upsert path; the explicit
+// reading-state selector bypasses this and honors the user's choice verbatim.
+function preserveMoreAdvancedState(incoming: ReadingState) {
+  return sql`CASE
+    WHEN ${userLibrary.readingState} = 'read' THEN 'read'
+    WHEN ${userLibrary.readingState} = 'reading' THEN (CASE WHEN ${incoming} = 'read' THEN 'read' ELSE 'reading' END)
+    WHEN ${userLibrary.readingState} = 'todo' THEN (CASE WHEN ${incoming} IN ('reading','read') THEN ${incoming} ELSE 'todo' END)
+    ELSE ${incoming}
+  END`;
+}
+
 @Injectable()
 export class LibraryService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
@@ -115,8 +127,18 @@ export class LibraryService {
   }
 
   // ── Upsert / update association ───────────────────────────────────────────
+  //
+  // Non-regression rule (server-enforced): a *quick* intent (e.g. recommendation card
+  // "加入书架并设为待读") must never silently downgrade a more-advanced reading state.
+  // It preserves max(existing, incoming). Only an EXPLICIT state selector
+  // (opts.explicitState) — the user deliberately picking a state — may regress.
 
-  async upsert(userId: string, paperId: string, dto: UpsertLibraryRequest): Promise<LibraryItem> {
+  async upsert(
+    userId: string,
+    paperId: string,
+    dto: UpsertLibraryRequest,
+    opts: { explicitState?: boolean } = {},
+  ): Promise<LibraryItem> {
     const [paper] = await this.db
       .select({ id: papers.id })
       .from(papers)
@@ -134,6 +156,13 @@ export class LibraryService {
     if (dto.readingState !== undefined) values.readingState = dto.readingState;
     if (dto.personalTags !== undefined) values.personalTags = dto.personalTags;
 
+    // Non-explicit quick write supplies a reading state -> keep the more advanced of
+    // existing vs incoming on conflict (never downgrade read/reading to todo).
+    const preserveReadingState =
+      dto.readingState !== undefined && !opts.explicitState
+        ? preserveMoreAdvancedState(dto.readingState as ReadingState)
+        : undefined;
+
     const [row] = await this.db
       .insert(userLibrary)
       .values(values as typeof userLibrary.$inferInsert)
@@ -141,7 +170,11 @@ export class LibraryService {
         target: [userLibrary.userId, userLibrary.paperId],
         set: {
           ...(dto.isFavorite !== undefined ? { isFavorite: dto.isFavorite } : {}),
-          ...(dto.readingState !== undefined ? { readingState: dto.readingState } : {}),
+          ...(dto.readingState !== undefined
+            ? preserveReadingState
+              ? { readingState: preserveReadingState }
+              : { readingState: dto.readingState }
+            : {}),
           ...(dto.personalTags !== undefined ? { personalTags: dto.personalTags } : {}),
           updatedAt: new Date(),
           updatedBy: userId,

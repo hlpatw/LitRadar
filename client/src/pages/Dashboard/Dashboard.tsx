@@ -51,8 +51,9 @@ const Dashboard: React.FC = () => {
         { label: '期刊源', value: ov.stats.journalCount, href: '/journals' },
         { label: '论文', value: ov.stats.paperCount, href: '/papers' },
         { label: '收藏', value: ov.stats.favoriteCount, href: '/papers?favorite=1' },
-        { label: '待读', value: ov.stats.checklistTodoCount, href: '/checklist' },
-        { label: '已读', value: ov.stats.checklistDoneCount, href: '/checklist' },
+        { label: '待读', value: ov.stats.checklistTodoCount, href: '/library?status=todo' },
+        { label: '阅读中', value: ov.stats.readingCount, href: '/library?status=reading' },
+        { label: '已读', value: ov.stats.checklistDoneCount, href: '/library?status=read' },
         { label: '笔记', value: ov.stats.noteCount, href: '/notes' },
       ];
 
@@ -69,7 +70,7 @@ const Dashboard: React.FC = () => {
       <section className="mt-10">
         <div className="grid grid-cols-1 gap-[14px] sm:grid-cols-2 md:grid-cols-4">
           {loading
-            ? Array.from({ length: 6 }).map((_, i: number) => (
+            ? Array.from({ length: 7 }).map((_, i: number) => (
                 <div key={i} className="animate-pulse rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-[22px_24px]">
                   <div className="h-10 w-16 rounded bg-[var(--border)]" />
                 </div>

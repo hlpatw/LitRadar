@@ -1,16 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Star, BookOpen, Filter, RotateCcw, XCircle, Trash2, Sparkles } from 'lucide-react';
+import { Star, BookOpen, Filter, RotateCcw, XCircle, Trash2, Sparkles, StickyNote } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
-import { library as libraryApi } from '@/api';
+import { library as libraryApi, workspace as workspaceApi } from '@/api';
 import type {
   LibraryItem,
   RecommendationItem,
+  ChecklistItem,
 } from '@shared/api.interface';
 
 const STATUS_PILLS = [
@@ -20,6 +22,8 @@ const STATUS_PILLS = [
   { key: 'reading', label: '阅读中' },
   { key: 'read', label: '已读' },
 ] as const;
+
+const VALID_STATUS = new Set(['', 'favorite', 'todo', 'reading', 'read']);
 
 const STATE_LABEL: Record<string, string> = { todo: '待读', reading: '阅读中', read: '已读' };
 
@@ -183,13 +187,35 @@ function RecCard({ item, onSaved }: { item: RecommendationItem; onSaved: (paperI
 import { Plus as PlusIcon } from 'lucide-react';
 
 export default function Library() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlStatus = searchParams.get('status') ?? '';
+  const status = VALID_STATUS.has(urlStatus) ? urlStatus : '';
+
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [recs, setRecs] = useState<RecommendationItem[]>([]);
   const [coldStart, setColdStart] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<string>('');
   const [q, setQ] = useState('');
   const [tag, setTag] = useState('');
+  const [orphans, setOrphans] = useState<ChecklistItem[]>([]);
+
+  const setStatus = (next: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (next) params.set('status', next);
+    else params.delete('status');
+    setSearchParams(params, { replace: true });
+  };
+
+  const loadOrphans = useCallback(async () => {
+    try {
+      const all = await workspaceApi.getChecklist();
+      // Orphan free-text legacy entries (paperId IS NULL) are preserved in this compatibility
+      // region; they are NOT paper associations and never enter the tabbed library list.
+      setOrphans(all.filter((c) => c.paperId === null));
+    } catch {
+      setOrphans([]);
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -212,6 +238,19 @@ export default function Library() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    loadOrphans();
+  }, [loadOrphans]);
+
+  const deleteOrphan = async (id: string) => {
+    try {
+      await workspaceApi.deleteChecklistItem(id);
+      setOrphans((prev) => prev.filter((o) => o.id !== id));
+    } catch {
+      toast.error('删除失败');
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -220,7 +259,7 @@ export default function Library() {
         </h1>
       </div>
 
-      {/* Filters */}
+      {/* Fixed tabs, driven by ?status= so /checklist redirects here land on 待读. */}
       <div className="mt-[40px] flex flex-wrap items-center gap-2">
         {STATUS_PILLS.map((p) => (
           <Button
@@ -298,6 +337,29 @@ export default function Library() {
           </div>
         )}
       </section>
+
+      {/* Compatibility region: legacy orphan free-text checklist (no paper association). */}
+      {orphans.length > 0 && (
+        <section className="mt-[40px]">
+          <h2 className="flex items-center gap-2 font-serif text-[20px] font-bold text-[var(--foreground)]">
+            <StickyNote className="size-4 text-[var(--muted-foreground)]" />
+            手动条目（旧阅读清单）
+          </h2>
+          <p className="mt-1 text-[12.5px] text-[var(--muted-foreground)]">
+            这些旧版自由文本待办未关联具体论文，仅在此兼容保留。
+          </p>
+          <div className="mt-3 flex flex-col gap-2">
+            {orphans.map((o) => (
+              <div key={o.id} className="flex items-center justify-between rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-2">
+                <span className="text-[13.5px]">{o.title}</span>
+                <Button size="sm" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => deleteOrphan(o.id)}>
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

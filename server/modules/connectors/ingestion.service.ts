@@ -1,5 +1,5 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
-import { eq, inArray, sql, desc } from 'drizzle-orm';
+import { Injectable, Inject, Logger, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
+import { eq, and, inArray, sql, desc } from 'drizzle-orm';
 import { DATABASE, type Database } from '../../database/database.module';
 import { journals, papers, sourceSyncRuns } from '../../database/schema';
 import { CrossrefConnector } from './crossref.connector';
@@ -49,7 +49,62 @@ export class IngestionService {
     if (source.length === 0) {
       throw new Error(`No journal row for ISSN ${issn}`);
     }
-    const src = source[0];
+    return this.runCrossrefSync(source[0], rows);
+  }
+
+  /**
+   * Admin single-source sync keyed by source id (the Source Management UI).
+   * Enforces, in order: existence -> connector wired for Crossref -> no run already running.
+   * Skeleton/disabled sources are rejected with a human-readable reason (the UI also
+   * disables the button, but the API is the hard gate).
+   */
+  async syncSourceById(sourceId: string): Promise<SyncOutcome> {
+    const rows = await this.db.select().from(journals).where(eq(journals.id, sourceId)).limit(1);
+    if (rows.length === 0) throw new NotFoundException('来源不存在');
+    const src = rows[0];
+
+    if (src.connectorStatus !== 'ready') {
+      const reason =
+        src.connectorStatus === 'skeleton'
+          ? `连接器尚未实现（${src.connectorType ?? 'unknown'}），暂不可同步`
+          : `连接器已停用（${src.connectorType ?? 'unknown'}），不可同步`;
+      throw new BadRequestException(reason);
+    }
+    if (src.connectorType !== 'crossref' || !src.issn) {
+      throw new BadRequestException('该来源当前无可用的 Crossref 连接器');
+    }
+
+    // Running protection with a stale threshold: a run abandoned mid-flight (e.g. crashed
+    // process) leaves a 'running' row forever. If it is older than the stale threshold we
+    // mark it interrupted and allow a fresh run; a still-fresh running run -> 409.
+    const STALE_MS = 15 * 60 * 1000;
+    const staleCutoff = new Date(Date.now() - STALE_MS);
+    await this.db
+      .update(sourceSyncRuns)
+      .set({ status: 'error', finishedAt: new Date(), message: 'interrupted: stale running run assumed dead' })
+      .where(
+        and(
+          eq(sourceSyncRuns.sourceId, sourceId),
+          eq(sourceSyncRuns.status, 'running'),
+          sql`${sourceSyncRuns.startedAt} < ${staleCutoff.toISOString()}`,
+        ),
+      );
+
+    const [stale] = await this.db
+      .select({ id: sourceSyncRuns.id })
+      .from(sourceSyncRuns)
+      .where(and(eq(sourceSyncRuns.sourceId, sourceId), eq(sourceSyncRuns.status, 'running')))
+      .limit(1);
+    if (stale) {
+      throw new ConflictException('该来源已有正在进行的同步，请稍后再试');
+    }
+
+    return this.runCrossrefSync(src, 25);
+  }
+
+  /** Core Crossref incremental pull shared by the ISSN and sourceId entry points. */
+  private async runCrossrefSync(src: typeof journals.$inferSelect, rows = 25): Promise<SyncOutcome> {
+    const issn = src.issn!;
 
     const [run] = await this.db
       .insert(sourceSyncRuns)
@@ -174,6 +229,43 @@ export class IngestionService {
       })
       .from(sourceSyncRuns)
       .leftJoin(journals, eq(sourceSyncRuns.sourceId, journals.id))
+      .orderBy(desc(sourceSyncRuns.startedAt))
+      .limit(Math.min(Math.max(limit, 1), 200));
+
+    return rows.map((r) => ({
+      id: r.id,
+      sourceId: r.sourceId,
+      sourceName: r.sourceName,
+      connectorType: r.connectorType,
+      status: r.status,
+      startedAt: (r.startedAt as Date).toISOString(),
+      finishedAt: r.finishedAt ? (r.finishedAt as Date).toISOString() : null,
+      fetchedCount: r.fetchedCount,
+      insertedCount: r.insertedCount,
+      updatedCount: r.updatedCount,
+      message: r.message,
+    }));
+  }
+
+  /** Full run history for one source (admin Source Management), newest first. */
+  async listRunsForSource(sourceId: string, limit = 50): Promise<SyncRunRow[]> {
+    const rows = await this.db
+      .select({
+        id: sourceSyncRuns.id,
+        sourceId: sourceSyncRuns.sourceId,
+        sourceName: journals.name,
+        connectorType: sourceSyncRuns.connectorType,
+        status: sourceSyncRuns.status,
+        startedAt: sourceSyncRuns.startedAt,
+        finishedAt: sourceSyncRuns.finishedAt,
+        fetchedCount: sourceSyncRuns.fetchedCount,
+        insertedCount: sourceSyncRuns.insertedCount,
+        updatedCount: sourceSyncRuns.updatedCount,
+        message: sourceSyncRuns.message,
+      })
+      .from(sourceSyncRuns)
+      .leftJoin(journals, eq(sourceSyncRuns.sourceId, journals.id))
+      .where(eq(sourceSyncRuns.sourceId, sourceId))
       .orderBy(desc(sourceSyncRuns.startedAt))
       .limit(Math.min(Math.max(limit, 1), 200));
 
