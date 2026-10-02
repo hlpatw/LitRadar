@@ -15,6 +15,14 @@
   "model_version": null,
   "prompt_version": "prompt-abstract-v1",
   "cards_produced": 0,
-  "instruction": "To run the model later: set an authorized API key, extract cards into data/cards/model/<paper_id>.json conforming to schemas/evidence_card.schema.json, then run src/evaluate.py. Do NOT hand-write or fabricate cards to fill the 50 slots.",
+  "evaluation_target": {
+    "snapshot_file_sha256": "4c23afbedbb66890c96238de3a9a0a273024ff13fc611f314101ca4d1bb582bb",
+    "staging_commit": "d6b32862b112daa20805057c96e7a4c468b5a52",
+    "seed": 20261003,
+    "manifest_selection_sha256": "97db71274ebe1a72bd77a6b6385c9be318dac12b65f4d4f76db50cf25dfd09c8",
+    "main_set_size": 50,
+    "abstract_policy": "main 50 drawn only from 97 abstract-bearing papers; 78 missing-abstract papers excluded from accuracy"
+  },
+  "instruction": "To run the model later: set an authorized API key, extract cards into data/cards/model/<paper_id>.json conforming to schemas/evidence_card.schema.json (one per manifest paper), then run src/evaluate.py. Do NOT hand-write or fabricate cards to fill the 50 slots.",
   "no_fabrication": true
 }

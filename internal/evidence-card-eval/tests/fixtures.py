@@ -31,3 +31,14 @@ def make_synthetic_snapshot(papers_per_source: int = 25) -> dict:
                           for s in READY_SOURCES],
         "papers": papers,
     }
+
+
+def make_realistic_snapshot() -> dict:
+    """Mirror the real staging abstract gap: sources 3,5,6 have NO abstracts; others do."""
+    snap = make_synthetic_snapshot(25)
+    no_abs = {READY_SOURCES[i]["source_id"] for i in (2, 4, 6)}  # Cognition-ish, JML-ish, LangAcq-ish
+    for p in snap["papers"]:
+        if p["source_id"] in no_abs:
+            p["abstract_text"] = None
+    return snap
+

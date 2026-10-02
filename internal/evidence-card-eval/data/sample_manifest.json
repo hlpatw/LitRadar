@@ -1,0 +1,1446 @@
+{
+  "manifest_version": "1.0.0",
+  "generated_at": "2026-10-02T16:27:32.856435+00:00",
+  "seed": 20261003,
+  "target_n": 50,
+  "actual_n": 50,
+  "selection_sha256": "97db71274ebe1a72bd77a6b6385c9be318dac12b65f4d4f76db50cf25dfd09c8",
+  "frame_policy": "abstract_only_main_set",
+  "fields_extracted": [
+    "research_question",
+    "method_paradigm",
+    "sample_population",
+    "sample_size",
+    "material_language",
+    "independent_variable",
+    "dependent_variable",
+    "main_findings",
+    "author_conclusion",
+    "author_limitations"
+  ],
+  "allocation_method": "largest_remainder_proportional over abstract-bearing papers",
+  "tie_break": "source_id ascending for leftover seats",
+  "within_stratum_sampling": "rng.sample over pool sorted by (normalized_doi, paper_id); rng seeded f'{seed}|{source_id}|abstract'",
+  "frame": {
+    "total_ready_papers": 175,
+    "abstract_bearing_frame": 97,
+    "missing_abstract": 78,
+    "ready_source_count": 7,
+    "abstract_source_count": 4,
+    "base_url": "https://eloquent-rebirth-staging.up.railway.app"
+  },
+  "snapshot_provenance": {
+    "snapshot_sha256": "0485fa0080419eee112d479c3fd0592dc8b87e9a113cbf43a7cfe808a650e2c7",
+    "staging_commit": "d6b32862b112daaa20805057c96e7a4c468b5a52",
+    "exported_at": "2026-10-02T16:22:25Z",
+    "snapshot_file_sha256": "4c23afbedbb66890c96238de3a9a0a273024ff13fc611f314101ca4d1bb582bb"
+  },
+  "allocation": [
+    {
+      "source_id": "1bc71bb8-14b1-4ca7-a6d9-405367ccabed",
+      "source_name": "Bilingualism: Language and Cognition",
+      "frame_n": 25,
+      "with_abstract": 25,
+      "missing_abstract": 0,
+      "selected_k": 13
+    },
+    {
+      "source_id": "246b61d8-c2bd-4b2c-9ec9-08d0d1dfa78c",
+      "source_name": "Applied Psycholinguistics",
+      "frame_n": 25,
+      "with_abstract": 25,
+      "missing_abstract": 0,
+      "selected_k": 13
+    },
+    {
+      "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+      "source_name": "Language Acquisition",
+      "frame_n": 25,
+      "with_abstract": 0,
+      "missing_abstract": 25,
+      "selected_k": 0
+    },
+    {
+      "source_id": "52a698ec-8e16-41cc-a25e-0c82928bf7df",
+      "source_name": "First Language",
+      "frame_n": 25,
+      "with_abstract": 24,
+      "missing_abstract": 1,
+      "selected_k": 12
+    },
+    {
+      "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+      "source_name": "Journal of Memory and Language",
+      "frame_n": 25,
+      "with_abstract": 0,
+      "missing_abstract": 25,
+      "selected_k": 0
+    },
+    {
+      "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+      "source_name": "Cognition",
+      "frame_n": 25,
+      "with_abstract": 0,
+      "missing_abstract": 25,
+      "selected_k": 0
+    },
+    {
+      "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+      "source_name": "Journal of Child Language",
+      "frame_n": 25,
+      "with_abstract": 23,
+      "missing_abstract": 2,
+      "selected_k": 12
+    }
+  ],
+  "excluded_sources_no_abstract": [
+    {
+      "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+      "source_name": "Language Acquisition",
+      "reason": "no abstracts in frame -> excluded from main eval set"
+    },
+    {
+      "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+      "source_name": "Journal of Memory and Language",
+      "reason": "no abstracts in frame -> excluded from main eval set"
+    },
+    {
+      "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+      "source_name": "Cognition",
+      "reason": "no abstracts in frame -> excluded from main eval set"
+    }
+  ],
+  "missing_abstract_report": {
+    "policy": "Papers without abstracts are NOT in the main 50. Coverage lists all of them; unknown_robustness_subset_optional tests forced abstention (G4) only.",
+    "total_missing_abstract": 78,
+    "missing_by_source": [
+      {
+        "source_id": "1bc71bb8-14b1-4ca7-a6d9-405367ccabed",
+        "source_name": "Bilingualism: Language and Cognition",
+        "missing": 0
+      },
+      {
+        "source_id": "246b61d8-c2bd-4b2c-9ec9-08d0d1dfa78c",
+        "source_name": "Applied Psycholinguistics",
+        "missing": 0
+      },
+      {
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "missing": 25
+      },
+      {
+        "source_id": "52a698ec-8e16-41cc-a25e-0c82928bf7df",
+        "source_name": "First Language",
+        "missing": 1
+      },
+      {
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "missing": 25
+      },
+      {
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "missing": 25
+      },
+      {
+        "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+        "source_name": "Journal of Child Language",
+        "missing": 2
+      }
+    ],
+    "missing_papers": [
+      {
+        "paper_id": "5a231daa-63fd-43f8-9eb4-0768374a4198",
+        "doi": "10.1016/j.cognition.2026.106689",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Explanation generation: Questions direct exploration in semantic space"
+      },
+      {
+        "paper_id": "56aa63f4-57a2-4ff2-8062-e29e3b922a2e",
+        "doi": "10.1016/j.cognition.2026.106693",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Adaptive judgment in the cognitive reflection test: A computational analysis"
+      },
+      {
+        "paper_id": "b64ce40d-35b4-4ad8-b97f-c5c47c78279f",
+        "doi": "10.1016/j.cognition.2026.106695",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "The impact of visual imagery absence on fine-grained memory for object colour and size: an aphantasia study"
+      },
+      {
+        "paper_id": "b95f3368-5781-4da4-a7c4-fdf007b18216",
+        "doi": "10.1016/j.cognition.2026.106698",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "What primates know about other minds and how often they use it: A computational approach to comparative theory of mind"
+      },
+      {
+        "paper_id": "1497281b-4a6a-4e7b-9254-299e1902ae7a",
+        "doi": "10.1016/j.cognition.2026.106699",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Visual perspective-taking and image-like representations: we can see it"
+      },
+      {
+        "paper_id": "706fe415-0755-42cc-ba19-b935a5dc5837",
+        "doi": "10.1016/j.cognition.2026.106700",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Outcome severity increases verbal probabilities used in dyadic communications"
+      },
+      {
+        "paper_id": "19ac433b-6cc6-413f-89c4-15b195eabbca",
+        "doi": "10.1016/j.cognition.2026.106701",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "The cost of “what might have been”: false memories for counterfactual actions"
+      },
+      {
+        "paper_id": "9729116c-1ce1-44ba-b696-b5720851b8e9",
+        "doi": "10.1016/j.cognition.2026.106702",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "It's about time: Specific and unspecific effects of episodic future thinking on farsighted decisions"
+      },
+      {
+        "paper_id": "9e3b1293-ab17-413b-a736-29ae6d299899",
+        "doi": "10.1016/j.cognition.2026.106703",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Predictive processing in sentence reading: Semantic prediction but not phonological facilitation in deaf readers"
+      },
+      {
+        "paper_id": "affd236a-8970-45be-9fd6-00dda89912a0",
+        "doi": "10.1016/j.cognition.2026.106704",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Social feedback informs generalisation of control beliefs"
+      },
+      {
+        "paper_id": "67fe3686-853d-4126-81b8-b776fbefc2ea",
+        "doi": "10.1016/j.cognition.2026.106712",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Syntactic headedness aligns with visual narrative structure"
+      },
+      {
+        "paper_id": "80fb989f-aba9-418a-98ff-1f90fe089bbb",
+        "doi": "10.1016/j.cognition.2026.106713",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Phrase-level speech timing preferences predict synchronization in joint reading"
+      },
+      {
+        "paper_id": "752c8674-9fa4-49da-a82f-3f7b23ac2d65",
+        "doi": "10.1016/j.cognition.2026.106714",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "The role of pitch in the vocal communication of intentions"
+      },
+      {
+        "paper_id": "7fae776f-ddfc-4374-bbbf-203206daf316",
+        "doi": "10.1016/j.cognition.2026.106715",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Temporal separation of meanings facilitates homophone learning"
+      },
+      {
+        "paper_id": "683e8097-4585-4a2e-8c1f-d7385d3ea613",
+        "doi": "10.1016/j.cognition.2026.106716",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Suboptimal but intact integration of reward information during perceptual decision-making in autism"
+      },
+      {
+        "paper_id": "9c37cec0-943b-43ee-b5fa-6417121caf9e",
+        "doi": "10.1016/j.cognition.2026.106720",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Internal Bayesian precision modulates the neural representation of social attention: Disentangling implicit and explicit components via model-informed multivariate EEG analysis"
+      },
+      {
+        "paper_id": "e90f98c8-5657-42b5-a1ae-d7e78246874e",
+        "doi": "10.1016/j.cognition.2026.106721",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Cross-modal social attention differs across emotional categories: Evidence from biological motion and gaze cues"
+      },
+      {
+        "paper_id": "36811f5c-88ea-4c59-8a31-4e223e5a0a31",
+        "doi": "10.1016/j.cognition.2026.106722",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Music influences the content of spontaneous thought"
+      },
+      {
+        "paper_id": "f8ca57bf-6717-4451-8d53-392d8e813ba1",
+        "doi": "10.1016/j.cognition.2026.106723",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Time pressure amplifies gender differences in mental rotation through shifts in evidence accumulation and response caution"
+      },
+      {
+        "paper_id": "ef89cba7-2496-4e5e-8d91-d230c41223c9",
+        "doi": "10.1016/j.cognition.2026.106725",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Belief updating across information ecologies: The trade-off between information gain and noise filtering"
+      },
+      {
+        "paper_id": "2a281e27-e367-4d8a-b3ae-ae686a41f599",
+        "doi": "10.1016/j.cognition.2026.106727",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "The objecthood of visual working memory representations influences their interaction with attention"
+      },
+      {
+        "paper_id": "26d87687-bb39-40db-9f10-a677e2490afb",
+        "doi": "10.1016/j.cognition.2026.106728",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Contours drive the tilt aftereffect in naturalistic images"
+      },
+      {
+        "paper_id": "72dbf5ee-c97d-419c-bd29-ad74523fd860",
+        "doi": "10.1016/j.cognition.2026.106730",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Semantic generation masks value directed remembering in memory but not metamemory: Evidence from truth-telling and lie fabrication"
+      },
+      {
+        "paper_id": "ae5a9cdc-fc46-4c92-b3b7-e24087938a67",
+        "doi": "10.1016/j.cognition.2026.106733",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "AI is not as conscious as humans: Essentialism in mental state attributions to artificial systems"
+      },
+      {
+        "paper_id": "0c7902f2-1976-45bc-a85c-e8a997e01be5",
+        "doi": "10.1016/j.cognition.2026.106734",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Input and uptake for complex syntactic structures in child language development: Implementing structural priming with diverse learner populations"
+      },
+      {
+        "paper_id": "a3b540bf-7c1d-4abf-a258-44029d2772f4",
+        "doi": "10.1016/j.jml.2026.104767",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Iconicity and morphophonological processing in sign recognition: insights from behavioral and pupillary response measures"
+      },
+      {
+        "paper_id": "de8121a6-da80-4462-afe1-74f1aba5a659",
+        "doi": "10.1016/j.jml.2026.104768",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "When and how phonological similarity facilitates logographic cognate processing: An examination with Chinese-Japanese bilinguals"
+      },
+      {
+        "paper_id": "112979ae-9470-458f-b7a8-f31a3858f184",
+        "doi": "10.1016/j.jml.2026.104769",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "That sounds exciting! Emotional iconicity facilitates processing and recall"
+      },
+      {
+        "paper_id": "c3e2b55e-60a7-49d2-866e-b0b2b70e4670",
+        "doi": "10.1016/j.jml.2026.104770",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "The effects of exposure variability and similarity on talker-independent adaptation to Spanish-accented English"
+      },
+      {
+        "paper_id": "8a156eca-792a-40b8-97b6-caf1dd9d556b",
+        "doi": "10.1016/j.jml.2026.104778",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Corrigendum to “Pausing to breathe and the speech–language relationship in production” [J. Mem. Lang. 149 (2026) 104763]"
+      },
+      {
+        "paper_id": "384d6b73-f717-4308-954b-cd7bfdbc7d66",
+        "doi": "10.1016/j.jml.2026.104779",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Remembering sentences not presented in lists"
+      },
+      {
+        "paper_id": "be37a656-3592-43c8-9702-895d26d449ab",
+        "doi": "10.1016/j.jml.2026.104780",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Recollective features in the natural language used to justify memory decisions"
+      },
+      {
+        "paper_id": "94862739-d1c9-4c80-8bdd-a6a88be8b8d4",
+        "doi": "10.1016/j.jml.2026.104781",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "How do individuals direct attention to valuable information in working memory tasks? Evidence from eye-tracking"
+      },
+      {
+        "paper_id": "b9484a3f-4ed2-4790-b2a7-285cb4ed5c77",
+        "doi": "10.1016/j.jml.2026.104782",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Understanding variation through code-switching: The effects of language experience and cultural identity on bilingual switching"
+      },
+      {
+        "paper_id": "da01d331-f6cc-404d-9629-bef8c73683e4",
+        "doi": "10.1016/j.jml.2026.104783",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Fast planning — fast production? The link between higher-level planning and acoustic duration in single word production"
+      },
+      {
+        "paper_id": "814866f6-8431-4be2-bfef-0317310d4ebc",
+        "doi": "10.1016/j.jml.2026.104784",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Representational magnitude as a geometric signature of image and word memorability"
+      },
+      {
+        "paper_id": "57c61f79-d969-4fc9-9fe1-0a2f8281f863",
+        "doi": "10.1016/j.jml.2026.104794",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Examining the contributions of item-specific and relational processing to the animacy effect in free recall"
+      },
+      {
+        "paper_id": "c74b6b86-4ed5-4266-a2bc-594adfd33976",
+        "doi": "10.1016/j.jml.2026.104795",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Negation induced forgetting: Investigating potential boundary conditions"
+      },
+      {
+        "paper_id": "55864cbc-c49f-492c-9a88-e6c361ac936b",
+        "doi": "10.1016/j.jml.2026.104796",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Retroactive facilitation and change awareness across lags and retention intervals"
+      },
+      {
+        "paper_id": "1036b50d-a7e7-49c6-90ce-bfc94f6dc11e",
+        "doi": "10.1016/j.jml.2026.104797",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Does prediction error explain referential adaptation?"
+      },
+      {
+        "paper_id": "7073f8f9-daf0-40e4-8341-f6c4bd544ab0",
+        "doi": "10.1016/j.jml.2026.104798",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Is case-invariant word recognition truly abstract? Insights from the diffusion model"
+      },
+      {
+        "paper_id": "1f863478-726c-4aca-85cd-5066083f61bd",
+        "doi": "10.1016/j.jml.2026.104799",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Priming beyond syntax: Crosslinguistic evidence for shared syntactic and thematic representations in Polish-English bilingual children"
+      },
+      {
+        "paper_id": "85f15548-00c6-46eb-ba50-0c6b487725b6",
+        "doi": "10.1016/j.jml.2026.104800",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "The benefits of choice for self-regulated learning: learner control enhances recognition memory"
+      },
+      {
+        "paper_id": "364a8e67-3027-4267-8ad0-dc6d5040b8db",
+        "doi": "10.1016/j.jml.2026.104810",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Context memory in younger and older adults: Insights from metacognition"
+      },
+      {
+        "paper_id": "97b74ad1-7a15-4f7d-ace3-20c0a1745026",
+        "doi": "10.1016/j.jml.2026.104811",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Bilinguals automatically access both languages based on “irrelevant” acoustic detail: Evidence from lexical tone"
+      },
+      {
+        "paper_id": "1787f279-8110-4dbf-b509-54887c85cb61",
+        "doi": "10.1016/j.jml.2026.104812",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Beyond visual similarity: Reversal-related masked priming in Korean Hangul"
+      },
+      {
+        "paper_id": "55ab58f9-3f92-491d-b129-89792ef1c9f0",
+        "doi": "10.1016/j.jml.2026.104814",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Tell me what you read, and I will tell you what you remember: Evidence for personalized embeddings in memory modelling"
+      },
+      {
+        "paper_id": "f805ee61-2fdf-4961-9b62-7e66e94306f3",
+        "doi": "10.1016/j.jml.2026.104815",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Does fast mapping accelerate lexical integration? Evidence from spoken and written novel words"
+      },
+      {
+        "paper_id": "32a69c9d-6833-4c28-8b30-b321b0877557",
+        "doi": "10.1016/s0749-596x(26)00058-6",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Editorial Board"
+      },
+      {
+        "paper_id": "ab12ecaf-d88f-429b-85eb-904dc3f8046c",
+        "doi": "10.1016/s0749-596x(26)00074-4",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Editorial Board"
+      },
+      {
+        "paper_id": "d8614152-1598-41d5-85af-cbb04b4131cb",
+        "doi": "10.1017/s0305000926100786",
+        "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+        "source_name": "Journal of Child Language",
+        "title": "Lexical Development in Bilingual Adolescents: A Study of Chinese–English Word Association Networks– ADDENDUM"
+      },
+      {
+        "paper_id": "b8285173-77fb-46eb-8955-2fa4fdb11661",
+        "doi": "10.1017/s0305000926100865",
+        "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+        "source_name": "Journal of Child Language",
+        "title": "The relationship between maternal input, culture, and the strength of noun bias in Palestinian-Arabic-learning infants – ADDENDUM"
+      },
+      {
+        "paper_id": "5992812a-55bd-497e-8f9f-5f1721294204",
+        "doi": "10.1080/10489223.2025.2579283",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Morphological salience matters to aspectual production: Evidence from Mandarin-speaking children with and without developmental language disorder"
+      },
+      {
+        "paper_id": "4f943a0c-ad13-47bf-833a-a1b7782c16e7",
+        "doi": "10.1080/10489223.2025.2583134",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Parents align American Sign Language (ASL) input with deaf children’s gaze"
+      },
+      {
+        "paper_id": "a0a80a30-72bf-424c-b264-eae30404e392",
+        "doi": "10.1080/10489223.2025.2585078",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Investigating second language (L2) learners’ acquisition of scalar implicatures: Insights from scalar diversity"
+      },
+      {
+        "paper_id": "a7c659d8-d905-4afd-a2e5-9e48245bd296",
+        "doi": "10.1080/10489223.2025.2585081",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Disjunction across polarities: Scope versus strengthening in children’s interpretations of negative disjunctive sentences"
+      },
+      {
+        "paper_id": "92bf859e-4652-412f-a058-f5dab2c1b62f",
+        "doi": "10.1080/10489223.2025.2603201",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "A comparative analysis of request strategies in Russian monolingual and Russian-Hebrew bilingual children"
+      },
+      {
+        "paper_id": "1f0bda07-4fc1-4e15-bebe-143e89b17182",
+        "doi": "10.1080/10489223.2025.2608984",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Semantic gradients mediate Mandarin-speaking children’s acquisition of unaccusativity"
+      },
+      {
+        "paper_id": "0f1058d3-6909-467d-b872-42ca34fbdd72",
+        "doi": "10.1080/10489223.2025.2609930",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Language exposure and use among children acquiring Finnish Sign Language"
+      },
+      {
+        "paper_id": "6d23fcf6-c038-46b2-bae9-18f5af876c80",
+        "doi": "10.1080/10489223.2026.2613909",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "The gap between humans and language models: Analyzing adjective performance"
+      },
+      {
+        "paper_id": "62645385-a4db-455b-86ea-89dfcc427be5",
+        "doi": "10.1080/10489223.2026.2619669",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "First language (L1) maintenance in typologically close languages: The role of second language (L2) exposure and L2 performance"
+      },
+      {
+        "paper_id": "b47bfded-e9a1-4664-8212-98368df428ee",
+        "doi": "10.1080/10489223.2026.2642597",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Infant-directed speech in Argentinian Spanish across the first year of life"
+      },
+      {
+        "paper_id": "8504b81f-5af4-4830-899d-726509411a60",
+        "doi": "10.1080/10489223.2026.2645834",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "The acquisition path of expressing social meaning in the morphosyntax of requests"
+      },
+      {
+        "paper_id": "e3c8b136-c6f8-4e73-8f54-51cae2c9ae0c",
+        "doi": "10.1080/10489223.2026.2647933",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Semantic skills and input frequency influence classifier learning among Mandarin-speaking children: Perspectives from a novel classifier learning task"
+      },
+      {
+        "paper_id": "c527f4da-1edd-488b-98a2-dcf12cac9ea3",
+        "doi": "10.1080/10489223.2026.2651189",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Event context influences motion verb mapping"
+      },
+      {
+        "paper_id": "13ce4c5e-bb03-4e33-9c35-40acccea0861",
+        "doi": "10.1080/10489223.2026.2654507",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Early or late complementizer phrase (CP) acquisition? Evidence from topics and other CP diagnostics in Germanic–Romance bilinguals"
+      },
+      {
+        "paper_id": "86a5afcd-a369-4358-b8bf-18d1dce7b704",
+        "doi": "10.1080/10489223.2026.2662289",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "The relation between numeral acquisition and morphosyntactic cues in kindergartners with and without (suspected) Developmental Language Disorder"
+      },
+      {
+        "paper_id": "8e2bbf35-cdc8-42e2-9c86-c62120b07b15",
+        "doi": "10.1080/10489223.2026.2667244",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Structural priming as a means of learning a new grammatical structure? Priming for transitives in Dutch learners of French"
+      },
+      {
+        "paper_id": "48d24e4c-757f-4f13-a129-2cb6777ed048",
+        "doi": "10.1080/10489223.2026.2674642",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Information structure in first language acquisition: The effect of sentence-level focus on preschoolers’ logical scope interpretation"
+      },
+      {
+        "paper_id": "2f7d6f07-2870-4dc9-aecd-e878f0b5d20f",
+        "doi": "10.1080/10489223.2026.2675468",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Learning modal force: Evidence from French"
+      },
+      {
+        "paper_id": "bd77d938-3398-45c7-a9e3-939a1b843d64",
+        "doi": "10.1080/10489223.2026.2677640",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Insights into the morphological errors of adolescents with ASD"
+      },
+      {
+        "paper_id": "1401fa47-608d-410a-96aa-d6011ac3b594",
+        "doi": "10.1080/10489223.2026.2690945",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Eliciting the grammar of stress: Morphophonological conditioning in Greek by school-age children and adults"
+      },
+      {
+        "paper_id": "0f94919a-5d9b-4a4d-bafe-aa872e58d645",
+        "doi": "10.1080/10489223.2026.2698562",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Morphological access to alternatives fails to boost scalar implicatures: interpretation of disjunction in Turkish-speaking children"
+      },
+      {
+        "paper_id": "4f36a238-15e3-4be8-bdce-868a05572661",
+        "doi": "10.1080/10489223.2026.2699396",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "The Acquisition of Spanish active and passive voice: child bilinguals’ and monolinguals’ spontaneous production"
+      },
+      {
+        "paper_id": "1bfa0daf-89aa-4591-a599-07b496d2b84d",
+        "doi": "10.1080/10489223.2026.2702446",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Children and adults’ treatment of partial objects in bounded quantificational contexts"
+      },
+      {
+        "paper_id": "8611f5c8-f377-4f64-a134-c47899a5d9f7",
+        "doi": "10.1080/10489223.2026.2714325",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Exploring longitudinal changes in the pragmatic functions of child-directed speech in an Argentinian sample"
+      },
+      {
+        "paper_id": "f31c50a5-6260-4cde-b8f4-79259c03e9b4",
+        "doi": "10.1080/10489223.2026.2722197",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Heritage language research: a methodological synthesis of the past 25 years"
+      },
+      {
+        "paper_id": "595fe274-90b5-4e26-8efe-af9a2e856d3a",
+        "doi": "10.1177/01427237261435630",
+        "source_id": "52a698ec-8e16-41cc-a25e-0c82928bf7df",
+        "source_name": "First Language",
+        "title": "Introduction to the Special Section on ‘DLD: A Consequence of Exemplar-Based Learning?’"
+      }
+    ],
+    "unknown_robustness_subset_optional": [
+      {
+        "paper_id": "5a231daa-63fd-43f8-9eb4-0768374a4198",
+        "doi": "10.1016/j.cognition.2026.106689",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Explanation generation: Questions direct exploration in semantic space"
+      },
+      {
+        "paper_id": "19ac433b-6cc6-413f-89c4-15b195eabbca",
+        "doi": "10.1016/j.cognition.2026.106701",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "The cost of “what might have been”: false memories for counterfactual actions"
+      },
+      {
+        "paper_id": "9e3b1293-ab17-413b-a736-29ae6d299899",
+        "doi": "10.1016/j.cognition.2026.106703",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Predictive processing in sentence reading: Semantic prediction but not phonological facilitation in deaf readers"
+      },
+      {
+        "paper_id": "752c8674-9fa4-49da-a82f-3f7b23ac2d65",
+        "doi": "10.1016/j.cognition.2026.106714",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "The role of pitch in the vocal communication of intentions"
+      },
+      {
+        "paper_id": "9c37cec0-943b-43ee-b5fa-6417121caf9e",
+        "doi": "10.1016/j.cognition.2026.106720",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Internal Bayesian precision modulates the neural representation of social attention: Disentangling implicit and explicit components via model-informed multivariate EEG analysis"
+      },
+      {
+        "paper_id": "36811f5c-88ea-4c59-8a31-4e223e5a0a31",
+        "doi": "10.1016/j.cognition.2026.106722",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Music influences the content of spontaneous thought"
+      },
+      {
+        "paper_id": "ef89cba7-2496-4e5e-8d91-d230c41223c9",
+        "doi": "10.1016/j.cognition.2026.106725",
+        "source_id": "a7d0a236-944f-4dd9-a3c7-30efc249b080",
+        "source_name": "Cognition",
+        "title": "Belief updating across information ecologies: The trade-off between information gain and noise filtering"
+      },
+      {
+        "paper_id": "a3b540bf-7c1d-4abf-a258-44029d2772f4",
+        "doi": "10.1016/j.jml.2026.104767",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Iconicity and morphophonological processing in sign recognition: insights from behavioral and pupillary response measures"
+      },
+      {
+        "paper_id": "de8121a6-da80-4462-afe1-74f1aba5a659",
+        "doi": "10.1016/j.jml.2026.104768",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "When and how phonological similarity facilitates logographic cognate processing: An examination with Chinese-Japanese bilinguals"
+      },
+      {
+        "paper_id": "1787f279-8110-4dbf-b509-54887c85cb61",
+        "doi": "10.1016/j.jml.2026.104812",
+        "source_id": "7983cb07-b548-4179-853d-7b8d1d7eed77",
+        "source_name": "Journal of Memory and Language",
+        "title": "Beyond visual similarity: Reversal-related masked priming in Korean Hangul"
+      },
+      {
+        "paper_id": "d8614152-1598-41d5-85af-cbb04b4131cb",
+        "doi": "10.1017/s0305000926100786",
+        "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+        "source_name": "Journal of Child Language",
+        "title": "Lexical Development in Bilingual Adolescents: A Study of Chinese–English Word Association Networks– ADDENDUM"
+      },
+      {
+        "paper_id": "5992812a-55bd-497e-8f9f-5f1721294204",
+        "doi": "10.1080/10489223.2025.2579283",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Morphological salience matters to aspectual production: Evidence from Mandarin-speaking children with and without developmental language disorder"
+      },
+      {
+        "paper_id": "b47bfded-e9a1-4664-8212-98368df428ee",
+        "doi": "10.1080/10489223.2026.2642597",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Infant-directed speech in Argentinian Spanish across the first year of life"
+      },
+      {
+        "paper_id": "c527f4da-1edd-488b-98a2-dcf12cac9ea3",
+        "doi": "10.1080/10489223.2026.2651189",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Event context influences motion verb mapping"
+      },
+      {
+        "paper_id": "13ce4c5e-bb03-4e33-9c35-40acccea0861",
+        "doi": "10.1080/10489223.2026.2654507",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Early or late complementizer phrase (CP) acquisition? Evidence from topics and other CP diagnostics in Germanic–Romance bilinguals"
+      },
+      {
+        "paper_id": "86a5afcd-a369-4358-b8bf-18d1dce7b704",
+        "doi": "10.1080/10489223.2026.2662289",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "The relation between numeral acquisition and morphosyntactic cues in kindergartners with and without (suspected) Developmental Language Disorder"
+      },
+      {
+        "paper_id": "48d24e4c-757f-4f13-a129-2cb6777ed048",
+        "doi": "10.1080/10489223.2026.2674642",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Information structure in first language acquisition: The effect of sentence-level focus on preschoolers’ logical scope interpretation"
+      },
+      {
+        "paper_id": "1401fa47-608d-410a-96aa-d6011ac3b594",
+        "doi": "10.1080/10489223.2026.2690945",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Eliciting the grammar of stress: Morphophonological conditioning in Greek by school-age children and adults"
+      },
+      {
+        "paper_id": "1bfa0daf-89aa-4591-a599-07b496d2b84d",
+        "doi": "10.1080/10489223.2026.2702446",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Children and adults’ treatment of partial objects in bounded quantificational contexts"
+      },
+      {
+        "paper_id": "f31c50a5-6260-4cde-b8f4-79259c03e9b4",
+        "doi": "10.1080/10489223.2026.2722197",
+        "source_id": "3868e8cc-76ef-4aff-aa22-56e45df161ee",
+        "source_name": "Language Acquisition",
+        "title": "Heritage language research: a methodological synthesis of the past 25 years"
+      }
+    ]
+  },
+  "papers": [
+    {
+      "slot": 1,
+      "paper_id": "8e00ac54-56d5-425c-a155-bc5df34a3323",
+      "doi": "10.1017/s1366728926101436",
+      "doi_normalized": "10.1017/s1366728926101436",
+      "source_id": "1bc71bb8-14b1-4ca7-a6d9-405367ccabed",
+      "source_name": "Bilingualism: Language and Cognition",
+      "issn": "1366-7289",
+      "title": "Classifier congruency effects in Spanish–Chinese noun phrase production: Behavioral and electrophysiological evidence",
+      "abstract_sha256": "74869bf2e897050e93964c364472acdeb17fcde02997770c92354ea306e2a83e",
+      "has_abstract": true
+    },
+    {
+      "slot": 2,
+      "paper_id": "87bd94f0-5546-4fff-b93e-71da9d8d95b0",
+      "doi": "10.1017/s1366728926101552",
+      "doi_normalized": "10.1017/s1366728926101552",
+      "source_id": "1bc71bb8-14b1-4ca7-a6d9-405367ccabed",
+      "source_name": "Bilingualism: Language and Cognition",
+      "issn": "1366-7289",
+      "title": "Bilingualism shapes neural control: Distinct experiences predict conflict monitoring and sustained attentional control",
+      "abstract_sha256": "80a0f0c84592136f51722964c92738f924a0a3a9178794862a5a6f7bf0323da2",
+      "has_abstract": true
+    },
+    {
+      "slot": 3,
+      "paper_id": "941fb75f-88c9-4ec8-b5a4-75aa182e94aa",
+      "doi": "10.1017/s1366728926101564",
+      "doi_normalized": "10.1017/s1366728926101564",
+      "source_id": "1bc71bb8-14b1-4ca7-a6d9-405367ccabed",
+      "source_name": "Bilingualism: Language and Cognition",
+      "issn": "1366-7289",
+      "title": "Multilingual experience and cognitive control shape lexical competition in non-native word production: An fMRI study",
+      "abstract_sha256": "9d3e37080ae6f1024a347d739ce7659bf4b3965efafb0c67df8e17a9f4c8eb8c",
+      "has_abstract": true
+    },
+    {
+      "slot": 4,
+      "paper_id": "1dec319d-72b7-4a24-ae28-3be8ceb2a128",
+      "doi": "10.1017/s136672892610159x",
+      "doi_normalized": "10.1017/s136672892610159x",
+      "source_id": "1bc71bb8-14b1-4ca7-a6d9-405367ccabed",
+      "source_name": "Bilingualism: Language and Cognition",
+      "issn": "1366-7289",
+      "title": "Moral identity and language jointly influence how bilinguals feel and decide",
+      "abstract_sha256": "86ca84e5c61dccefa3ca6fa22af3c7500232e89e16fe59e8714a79bd73fce7ab",
+      "has_abstract": true
+    },
+    {
+      "slot": 5,
+      "paper_id": "fc44b88a-fc56-4f5d-ab80-f8f9069e5f38",
+      "doi": "10.1017/s136672892610162x",
+      "doi_normalized": "10.1017/s136672892610162x",
+      "source_id": "1bc71bb8-14b1-4ca7-a6d9-405367ccabed",
+      "source_name": "Bilingualism: Language and Cognition",
+      "issn": "1366-7289",
+      "title": "Cued vs. voluntary language switching in frequent code switchers: behavioral costs and benefits",
+      "abstract_sha256": "1abf66c74d4db9190df59ebb7dc9e678e0af97cabadcafb68e5a110dbfc0f1d1",
+      "has_abstract": true
+    },
+    {
+      "slot": 6,
+      "paper_id": "dc3e59c2-4363-4082-afaa-f4f872ed4bae",
+      "doi": "10.1017/s1366728926101643",
+      "doi_normalized": "10.1017/s1366728926101643",
+      "source_id": "1bc71bb8-14b1-4ca7-a6d9-405367ccabed",
+      "source_name": "Bilingualism: Language and Cognition",
+      "issn": "1366-7289",
+      "title": "Proficient bilinguals make less superstitious choices revisiting the FLE in light of L2 proficiency",
+      "abstract_sha256": "457021ea69c19e97dc001765d902248e6d9db68f8eb4f7f39a3c846ae91f1f9f",
+      "has_abstract": true
+    },
+    {
+      "slot": 7,
+      "paper_id": "e7f08c9b-4bbb-4b6f-9e15-8c3d9776fc96",
+      "doi": "10.1017/s1366728926101680",
+      "doi_normalized": "10.1017/s1366728926101680",
+      "source_id": "1bc71bb8-14b1-4ca7-a6d9-405367ccabed",
+      "source_name": "Bilingualism: Language and Cognition",
+      "issn": "1366-7289",
+      "title": "Developing the productive emotion vocabulary test (PEVT) for adult speakers of English as an additional language",
+      "abstract_sha256": "f856888f1149d3b59c397e6ce6aaebb874b3bd65448b1ac3918e402c5200b1e1",
+      "has_abstract": true
+    },
+    {
+      "slot": 8,
+      "paper_id": "12123e24-6ecb-496b-bc77-e922deed40a5",
+      "doi": "10.1017/s1366728926101746",
+      "doi_normalized": "10.1017/s1366728926101746",
+      "source_id": "1bc71bb8-14b1-4ca7-a6d9-405367ccabed",
+      "source_name": "Bilingualism: Language and Cognition",
+      "issn": "1366-7289",
+      "title": "Native-like orthographic awareness despite limited phonological-semantic development: Evidence from early Chinese-learning bilingual kindergarteners",
+      "abstract_sha256": "a5f2506dde5aac314f64be122b064e7c9ae30928506c2a99a199f1fa1e34bc59",
+      "has_abstract": true
+    },
+    {
+      "slot": 9,
+      "paper_id": "b7e1fcc6-1661-4a41-a425-67e4f72d9de5",
+      "doi": "10.1017/s1366728926101771",
+      "doi_normalized": "10.1017/s1366728926101771",
+      "source_id": "1bc71bb8-14b1-4ca7-a6d9-405367ccabed",
+      "source_name": "Bilingualism: Language and Cognition",
+      "issn": "1366-7289",
+      "title": "Does native culture restore emotional intensity? Distinct effects of cultural context on L2 affective processing",
+      "abstract_sha256": "ff80e5b4d3ec7ff7cfdf311c66b50d65073a16d4136a12780ef62ec329d08261",
+      "has_abstract": true
+    },
+    {
+      "slot": 10,
+      "paper_id": "6ab28c95-3a10-4f80-9f58-60b9f1769b2c",
+      "doi": "10.1017/s1366728926101783",
+      "doi_normalized": "10.1017/s1366728926101783",
+      "source_id": "1bc71bb8-14b1-4ca7-a6d9-405367ccabed",
+      "source_name": "Bilingualism: Language and Cognition",
+      "issn": "1366-7289",
+      "title": "Extending the in-group advantage: Vocal emotion recognition in first and second languages by Dutch-English bilinguals",
+      "abstract_sha256": "1f280ccac50efd23eac59613690697c221215ff41fd2fae22f13ec59985e5ee7",
+      "has_abstract": true
+    },
+    {
+      "slot": 11,
+      "paper_id": "b6ba0ca7-22db-4279-924c-d7f7f08e2e52",
+      "doi": "10.1017/s1366728926101813",
+      "doi_normalized": "10.1017/s1366728926101813",
+      "source_id": "1bc71bb8-14b1-4ca7-a6d9-405367ccabed",
+      "source_name": "Bilingualism: Language and Cognition",
+      "issn": "1366-7289",
+      "title": "Knowing and feeling: The role of semantic valence in emotional prosody perception for L2 Chinese learners",
+      "abstract_sha256": "6a4065299527df2fa81c5cc369da93d2694fa41112c9d63f4f4faddc00da07c5",
+      "has_abstract": true
+    },
+    {
+      "slot": 12,
+      "paper_id": "9c04c217-5c29-40c8-a267-eb702a40060e",
+      "doi": "10.1017/s1366728926101850",
+      "doi_normalized": "10.1017/s1366728926101850",
+      "source_id": "1bc71bb8-14b1-4ca7-a6d9-405367ccabed",
+      "source_name": "Bilingualism: Language and Cognition",
+      "issn": "1366-7289",
+      "title": "L2 exposure intensity modulates the time course of verbal humor comprehension: An ERP study",
+      "abstract_sha256": "295765e8fc85178b7e755a735e646ecfa7974c3865beec780c2a5b61f9815da2",
+      "has_abstract": true
+    },
+    {
+      "slot": 13,
+      "paper_id": "bb785857-9127-4c7a-90ad-4f6ded6c8995",
+      "doi": "10.1017/s136672892610193x",
+      "doi_normalized": "10.1017/s136672892610193x",
+      "source_id": "1bc71bb8-14b1-4ca7-a6d9-405367ccabed",
+      "source_name": "Bilingualism: Language and Cognition",
+      "issn": "1366-7289",
+      "title": "L1–L2 similarity and L2 word frequency effects in Chinese",
+      "abstract_sha256": "6a6763ad978d5468dc78f4ee619d3376022db1938c5c16bd51256031abcc1824",
+      "has_abstract": true
+    },
+    {
+      "slot": 14,
+      "paper_id": "6d9c3b77-f4a2-4f1b-b3d9-3d18dcb0d360",
+      "doi": "10.1017/s0142716425100428",
+      "doi_normalized": "10.1017/s0142716425100428",
+      "source_id": "246b61d8-c2bd-4b2c-9ec9-08d0d1dfa78c",
+      "source_name": "Applied Psycholinguistics",
+      "issn": "0142-7164",
+      "title": "Effects of stuttering and sound avoidance on reference production and memory",
+      "abstract_sha256": "639aebb6ef329e96effafd57601de783b51ecc40f65d600487dcb3c642ec77d8",
+      "has_abstract": true
+    },
+    {
+      "slot": 15,
+      "paper_id": "af5f9f8f-de13-4ac4-85f6-325f48478552",
+      "doi": "10.1017/s0142716426100459",
+      "doi_normalized": "10.1017/s0142716426100459",
+      "source_id": "246b61d8-c2bd-4b2c-9ec9-08d0d1dfa78c",
+      "source_name": "Applied Psycholinguistics",
+      "issn": "0142-7164",
+      "title": "The role of pitch statistical learning in second language morphosyntactic acquisition",
+      "abstract_sha256": "efcffeed5b31e4046d58b6d196ddd00eb29f298aa040f6791d9fa1d61e3c94a8",
+      "has_abstract": true
+    },
+    {
+      "slot": 16,
+      "paper_id": "61cde29a-5752-4223-aa2b-aacf9a713e92",
+      "doi": "10.1017/s0142716426100502",
+      "doi_normalized": "10.1017/s0142716426100502",
+      "source_id": "246b61d8-c2bd-4b2c-9ec9-08d0d1dfa78c",
+      "source_name": "Applied Psycholinguistics",
+      "issn": "0142-7164",
+      "title": "Older, wiser, linguistically savvy: A comparative experimental study of grammatical evidentiality across younger and older generations in Turkish and Korean Speakers",
+      "abstract_sha256": "d00425234bd584587cce803ed9ad8645b3b522fdad83aa9010238e903e49557a",
+      "has_abstract": true
+    },
+    {
+      "slot": 17,
+      "paper_id": "8d74313e-f9b5-49e6-b86b-416e0234d1a1",
+      "doi": "10.1017/s0142716426100605",
+      "doi_normalized": "10.1017/s0142716426100605",
+      "source_id": "246b61d8-c2bd-4b2c-9ec9-08d0d1dfa78c",
+      "source_name": "Applied Psycholinguistics",
+      "issn": "0142-7164",
+      "title": "The impact of task demand on subtitle reading in video games: an eye-tracking study",
+      "abstract_sha256": "fe5cb1dd4128e035cac69122e3a395ef3b6036bbd26ba98f1209377a6f257732",
+      "has_abstract": true
+    },
+    {
+      "slot": 18,
+      "paper_id": "741bd625-cf00-40d2-a448-f75ebfb6abcf",
+      "doi": "10.1017/s0142716426100629",
+      "doi_normalized": "10.1017/s0142716426100629",
+      "source_id": "246b61d8-c2bd-4b2c-9ec9-08d0d1dfa78c",
+      "source_name": "Applied Psycholinguistics",
+      "issn": "0142-7164",
+      "title": "The role of perceptual salience in L2 morphology acquisition: Attention, awareness, and intake",
+      "abstract_sha256": "3ecc9f40e4381122b042b7d0c3654da8abf90527276f80b251f8401bf6a8e7da",
+      "has_abstract": true
+    },
+    {
+      "slot": 19,
+      "paper_id": "b4ff2010-f521-4458-adec-66771dd4691e",
+      "doi": "10.1017/s0142716426100630",
+      "doi_normalized": "10.1017/s0142716426100630",
+      "source_id": "246b61d8-c2bd-4b2c-9ec9-08d0d1dfa78c",
+      "source_name": "Applied Psycholinguistics",
+      "issn": "0142-7164",
+      "title": "The processing advantage of emotion words in L1 speakers and L2 speakers: A meta-analysis",
+      "abstract_sha256": "386c2052c0eb628c312feccdfcb26484f96547e961196446c55dc3c3dd22d71a",
+      "has_abstract": true
+    },
+    {
+      "slot": 20,
+      "paper_id": "ea44697f-556d-4007-a73b-ff4a1c80db9f",
+      "doi": "10.1017/s014271642610071x",
+      "doi_normalized": "10.1017/s014271642610071x",
+      "source_id": "246b61d8-c2bd-4b2c-9ec9-08d0d1dfa78c",
+      "source_name": "Applied Psycholinguistics",
+      "issn": "0142-7164",
+      "title": "Mind over print: Cognitive predictors of the ability to communicate referentially",
+      "abstract_sha256": "ad05434c10d779fc6ae98635ec23bfbe9b12ed2029a84b298b89261f1cea1567",
+      "has_abstract": true
+    },
+    {
+      "slot": 21,
+      "paper_id": "cd5a9e91-150b-46af-b479-e4e523587362",
+      "doi": "10.1017/s0142716426100769",
+      "doi_normalized": "10.1017/s0142716426100769",
+      "source_id": "246b61d8-c2bd-4b2c-9ec9-08d0d1dfa78c",
+      "source_name": "Applied Psycholinguistics",
+      "issn": "0142-7164",
+      "title": "Heritage bilingualism and language processing disparities: Spanish influence on Kaqchikel Mayan word production and sentence structures",
+      "abstract_sha256": "f1bd9261be98e17a1c7787766bebd4e7dd4d6b51a0d2ed08de703a55d651a713",
+      "has_abstract": true
+    },
+    {
+      "slot": 22,
+      "paper_id": "887eb964-cab5-435a-8f78-3716fc295156",
+      "doi": "10.1017/s0142716426100861",
+      "doi_normalized": "10.1017/s0142716426100861",
+      "source_id": "246b61d8-c2bd-4b2c-9ec9-08d0d1dfa78c",
+      "source_name": "Applied Psycholinguistics",
+      "issn": "0142-7164",
+      "title": "A network analysis of the relationship between foreign language anxiety and listening fatigue in Arabic and Chinese learners of English",
+      "abstract_sha256": "7e00abf5cf9649cac0288230f5889b6b24f50b4394843e6ba3ab0c6c41442f4a",
+      "has_abstract": true
+    },
+    {
+      "slot": 23,
+      "paper_id": "acd40a39-b6ab-4799-af40-90b587e98ada",
+      "doi": "10.1017/s0142716426100940",
+      "doi_normalized": "10.1017/s0142716426100940",
+      "source_id": "246b61d8-c2bd-4b2c-9ec9-08d0d1dfa78c",
+      "source_name": "Applied Psycholinguistics",
+      "issn": "0142-7164",
+      "title": "How do L1 and L2 players read subtitles in video games? An exploratory eye-movement study",
+      "abstract_sha256": "104dac8b2640c4d5c5acdf88f4e9e173394dddb0fbda096f6655e086f9ff7c4d",
+      "has_abstract": true
+    },
+    {
+      "slot": 24,
+      "paper_id": "c7f90ea0-d767-407b-a984-091cc0a2ad1b",
+      "doi": "10.1017/s0142716426100976",
+      "doi_normalized": "10.1017/s0142716426100976",
+      "source_id": "246b61d8-c2bd-4b2c-9ec9-08d0d1dfa78c",
+      "source_name": "Applied Psycholinguistics",
+      "issn": "0142-7164",
+      "title": "Features predicting item difficulty in English and Spanish elision task",
+      "abstract_sha256": "31c7c10dc78ce98e88042f816b2591d7be9b933aff55be9864c347d5fbbc4ad7",
+      "has_abstract": true
+    },
+    {
+      "slot": 25,
+      "paper_id": "f8c8ce84-6643-458d-a3fc-52fa00942e6e",
+      "doi": "10.1017/s014271642610099x",
+      "doi_normalized": "10.1017/s014271642610099x",
+      "source_id": "246b61d8-c2bd-4b2c-9ec9-08d0d1dfa78c",
+      "source_name": "Applied Psycholinguistics",
+      "issn": "0142-7164",
+      "title": "On the acceptability of agreeing infinitives in Brazilian Portuguese",
+      "abstract_sha256": "8d65e2ffd484ab121c0fb9a69fa4c343403debb3415136c24d7f6fbd0bccce79",
+      "has_abstract": true
+    },
+    {
+      "slot": 26,
+      "paper_id": "18c32477-c414-475a-8934-de84d4b687b7",
+      "doi": "10.1017/s0142716426101039",
+      "doi_normalized": "10.1017/s0142716426101039",
+      "source_id": "246b61d8-c2bd-4b2c-9ec9-08d0d1dfa78c",
+      "source_name": "Applied Psycholinguistics",
+      "issn": "0142-7164",
+      "title": "Representation characteristics of English psych verbs in Chinese-English bilinguals: The modulating role of language proficiency",
+      "abstract_sha256": "31634e25c2533a074ffe218a72e89f848fc1143136ed9bb3c4ba106cda1e9a01",
+      "has_abstract": true
+    },
+    {
+      "slot": 27,
+      "paper_id": "ad4cd48f-bdf5-4725-b7e1-e64e08320cdb",
+      "doi": "10.1177/01427237261418102",
+      "doi_normalized": "10.1177/01427237261418102",
+      "source_id": "52a698ec-8e16-41cc-a25e-0c82928bf7df",
+      "source_name": "First Language",
+      "issn": "0142-7237",
+      "title": "Two Experimental Studies of Children’s Comprehension of Presuppositional\n                    <i>You</i>\n                    ‘Again’ in Mandarin",
+      "abstract_sha256": "f6153244f6d8e43862614baca1b17e78494d1dd7246a15172ff7a9f58e720482",
+      "has_abstract": true
+    },
+    {
+      "slot": 28,
+      "paper_id": "1869f311-c50c-4aa7-b544-f013c12aab2a",
+      "doi": "10.1177/01427237261419544",
+      "doi_normalized": "10.1177/01427237261419544",
+      "source_id": "52a698ec-8e16-41cc-a25e-0c82928bf7df",
+      "source_name": "First Language",
+      "issn": "0142-7237",
+      "title": "Development of Narrative Competence in Mano, Mande",
+      "abstract_sha256": "3ebf051eb32ee58dd7d6461302f47eb5b7ad983cc90bc77cb462af353637e9d3",
+      "has_abstract": true
+    },
+    {
+      "slot": 29,
+      "paper_id": "64b2f521-095d-4b01-aa73-e20cfb4028c8",
+      "doi": "10.1177/01427237261427762",
+      "doi_normalized": "10.1177/01427237261427762",
+      "source_id": "52a698ec-8e16-41cc-a25e-0c82928bf7df",
+      "source_name": "First Language",
+      "issn": "0142-7237",
+      "title": "Application of Recurrent Activation Models to Mechanistic Explanations of DLD: A Commentary on Riches (2026)",
+      "abstract_sha256": "fbc65fc34345303155041795f5f5b3f91ee1fc85e0013a827b53e69b224d8a6a",
+      "has_abstract": true
+    },
+    {
+      "slot": 30,
+      "paper_id": "82b8ffd1-fbe5-437c-b05c-a08e2e9e0c09",
+      "doi": "10.1177/01427237261427889",
+      "doi_normalized": "10.1177/01427237261427889",
+      "source_id": "52a698ec-8e16-41cc-a25e-0c82928bf7df",
+      "source_name": "First Language",
+      "issn": "0142-7237",
+      "title": "Comprehension of Relative Clauses in Chinese Children: Comparing Developmental Dyslexia, Attention-Deficit/Hyperactivity Disorder, and their Comorbidity",
+      "abstract_sha256": "113d899fc5e4b5313bfc42ed1cc2c4098e42aac4f31bade6659b0a85f15bd8b4",
+      "has_abstract": true
+    },
+    {
+      "slot": 31,
+      "paper_id": "0aa9ae09-58b7-4703-9bdd-d4fac489a9ad",
+      "doi": "10.1177/01427237261429185",
+      "doi_normalized": "10.1177/01427237261429185",
+      "source_id": "52a698ec-8e16-41cc-a25e-0c82928bf7df",
+      "source_name": "First Language",
+      "issn": "0142-7237",
+      "title": "Focus Comprehension in Mandarin-Speaking Children Aged 6 to 8: A Comparison Between Children With Cochlear Implants and Children With Autism Spectrum Disorder",
+      "abstract_sha256": "7c272cf3e5636a55fde924213f510023e3c4afca25c1dc5e816876c013116cc7",
+      "has_abstract": true
+    },
+    {
+      "slot": 32,
+      "paper_id": "a82b960b-21b9-4ea2-8fb6-65b9c16e7209",
+      "doi": "10.1177/01427237261429681",
+      "doi_normalized": "10.1177/01427237261429681",
+      "source_id": "52a698ec-8e16-41cc-a25e-0c82928bf7df",
+      "source_name": "First Language",
+      "issn": "0142-7237",
+      "title": "Development in Southwestern Norwegian Children’s Role-Play Register",
+      "abstract_sha256": "402777847f4db68f08ad8727359e325a836265e9ff54a3aca6556e03af5c26fa",
+      "has_abstract": true
+    },
+    {
+      "slot": 33,
+      "paper_id": "70a493da-9cd1-4921-ad08-b53e91acfbaa",
+      "doi": "10.1177/01427237261434721",
+      "doi_normalized": "10.1177/01427237261434721",
+      "source_id": "52a698ec-8e16-41cc-a25e-0c82928bf7df",
+      "source_name": "First Language",
+      "issn": "0142-7237",
+      "title": "A Response to the Commentaries on Riches (2026)",
+      "abstract_sha256": "3d5d7acaf252ae098436dd3e3438ce42011dae93234ce84da83e6b42b041cde9",
+      "has_abstract": true
+    },
+    {
+      "slot": 34,
+      "paper_id": "92ef12f6-461b-4987-9548-b444d7f8cbf8",
+      "doi": "10.1177/01427237261436933",
+      "doi_normalized": "10.1177/01427237261436933",
+      "source_id": "52a698ec-8e16-41cc-a25e-0c82928bf7df",
+      "source_name": "First Language",
+      "issn": "0142-7237",
+      "title": "Developing Presupposition in Mandarin-Speaking Preschoolers: A Dual Analysis of Cognitive and Pragmatic Features in Peer Interactions",
+      "abstract_sha256": "0a873744eeb7f6e4a0cec5632ae9306ddbee4d306ce66f7bd04e0afe7753c996",
+      "has_abstract": true
+    },
+    {
+      "slot": 35,
+      "paper_id": "ae3da7d3-ee32-471c-a1c2-a4a5aff84caa",
+      "doi": "10.1177/01427237261445477",
+      "doi_normalized": "10.1177/01427237261445477",
+      "source_id": "52a698ec-8e16-41cc-a25e-0c82928bf7df",
+      "source_name": "First Language",
+      "issn": "0142-7237",
+      "title": "Do Changes in a\n                    <i>Form’s Ratio of Conditioning</i>\n                    During Childhood Coincide with Changes in Children’s Lexical Representations?",
+      "abstract_sha256": "8d5f1da4ea5a57c0ad580cb9f1175dad2f1092c5c4ffc1126d7168243926254f",
+      "has_abstract": true
+    },
+    {
+      "slot": 36,
+      "paper_id": "767dd02b-259b-480c-ab59-0c7784a44454",
+      "doi": "10.1177/01427237261474261",
+      "doi_normalized": "10.1177/01427237261474261",
+      "source_id": "52a698ec-8e16-41cc-a25e-0c82928bf7df",
+      "source_name": "First Language",
+      "issn": "0142-7237",
+      "title": "Narrative Production Abilities in Mandarin-Speaking Children With and Without Autism Spectrum Disorder",
+      "abstract_sha256": "e95c5a91d549847d29a3ace7900d118878b9ced9a38da6d33a86d9026c0bbcd2",
+      "has_abstract": true
+    },
+    {
+      "slot": 37,
+      "paper_id": "da607af3-959f-41c5-beb8-2b0e50e97406",
+      "doi": "10.1177/01427237261479804",
+      "doi_normalized": "10.1177/01427237261479804",
+      "source_id": "52a698ec-8e16-41cc-a25e-0c82928bf7df",
+      "source_name": "First Language",
+      "issn": "0142-7237",
+      "title": "Speech Language and Communication Needs and Educational Outcomes in Children in Care: A Secondary Data Analysis",
+      "abstract_sha256": "172d7c231df7960262aad1aa65eb7fbed7941d5dd00fb9435044e29c0bc0516f",
+      "has_abstract": true
+    },
+    {
+      "slot": 38,
+      "paper_id": "86c67ced-5f60-4200-9a6c-b7d151a1f825",
+      "doi": "10.1177/01427237261483311",
+      "doi_normalized": "10.1177/01427237261483311",
+      "source_id": "52a698ec-8e16-41cc-a25e-0c82928bf7df",
+      "source_name": "First Language",
+      "issn": "0142-7237",
+      "title": "The Changing Frequency and Functions of Onomatopoeia in Early Interactions: From First Words to Vocabulary Spurt",
+      "abstract_sha256": "2ba8e651ba61a040d5d8b17ebb03910a039226d0a3c704f85ff3d46bcd73e6b0",
+      "has_abstract": true
+    },
+    {
+      "slot": 39,
+      "paper_id": "d3f07611-1f02-425d-89f3-c18510ff746f",
+      "doi": "10.1017/s0305000926100646",
+      "doi_normalized": "10.1017/s0305000926100646",
+      "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+      "source_name": "Journal of Child Language",
+      "issn": "0305-0009",
+      "title": "The Alignment between Language Properties and Computational Algorithms Enhances Statistical Word Segmentation: Evidence from Korean Child-Directed Speech",
+      "abstract_sha256": "dc10a2d69d4e79254652b414096f8d88f4cd3ae89c23ae670384eeb5d87f9110",
+      "has_abstract": true
+    },
+    {
+      "slot": 40,
+      "paper_id": "94737fef-4c59-4017-8077-76be4bf59533",
+      "doi": "10.1017/s0305000926100683",
+      "doi_normalized": "10.1017/s0305000926100683",
+      "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+      "source_name": "Journal of Child Language",
+      "issn": "0305-0009",
+      "title": "Input Language (English, Polish) and Monolingual and Bilingual Children’s Use of Compounding and Derivational Word-Formation Processes",
+      "abstract_sha256": "cad7dcc854d8b1348cbc35e57fd3c888ebd5fee52a90c8693d7caa90c50e537d",
+      "has_abstract": true
+    },
+    {
+      "slot": 41,
+      "paper_id": "4ab6234e-89b6-4a6d-a674-eae0a09cc50a",
+      "doi": "10.1017/s0305000926100695",
+      "doi_normalized": "10.1017/s0305000926100695",
+      "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+      "source_name": "Journal of Child Language",
+      "issn": "0305-0009",
+      "title": "Lexical Development in Bilingual Adolescents: A Study of Chinese–English Word Association Networks",
+      "abstract_sha256": "dd023d47ca9836fa2d59ae09c08019f1d285be45dc950881f209046458586e97",
+      "has_abstract": true
+    },
+    {
+      "slot": 42,
+      "paper_id": "0c258c37-ce3e-4222-9de0-d0c1a9b4ca26",
+      "doi": "10.1017/s0305000926100701",
+      "doi_normalized": "10.1017/s0305000926100701",
+      "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+      "source_name": "Journal of Child Language",
+      "issn": "0305-0009",
+      "title": "Accommodation or Adaptation? How L2 Reading Proficiency Affects Reading Strategies in EFL Learners with and without Dyslexia",
+      "abstract_sha256": "5e13dbadd7f2db7bf2a3dd6a2610e10332d9b8951f353bb68f389e0334fad944",
+      "has_abstract": true
+    },
+    {
+      "slot": 43,
+      "paper_id": "f4a00748-0417-4168-abeb-323bdcf2f274",
+      "doi": "10.1017/s0305000926100749",
+      "doi_normalized": "10.1017/s0305000926100749",
+      "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+      "source_name": "Journal of Child Language",
+      "issn": "0305-0009",
+      "title": "Examining the Robustness and Generalizability of the Shape Bias: A Meta-Analysis",
+      "abstract_sha256": "947b0d8362410cdfdd3a59a8d84eabed8792b6ff2c3989a1a86207ba14418c4d",
+      "has_abstract": true
+    },
+    {
+      "slot": 44,
+      "paper_id": "8e069e12-d01f-4c52-ac55-96fda6340833",
+      "doi": "10.1017/s0305000926100750",
+      "doi_normalized": "10.1017/s0305000926100750",
+      "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+      "source_name": "Journal of Child Language",
+      "issn": "0305-0009",
+      "title": "Noun-Modifying Clause Construction in Mandarin-Speaking Children",
+      "abstract_sha256": "7dbdb4207581335d19bfbb719d4d25c14a99198013058887921255a28095da76",
+      "has_abstract": true
+    },
+    {
+      "slot": 45,
+      "paper_id": "8294d93f-478e-4551-8029-73dedc0f8870",
+      "doi": "10.1017/s0305000926100816",
+      "doi_normalized": "10.1017/s0305000926100816",
+      "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+      "source_name": "Journal of Child Language",
+      "issn": "0305-0009",
+      "title": "Late acquisition of pronoun use in European Portuguese: Subject–object asymmetries in Portuguese-German bilingual children",
+      "abstract_sha256": "cdaf6558e0af918077dc0cad1be98344f119a276a72f91edd03b520f333dc41d",
+      "has_abstract": true
+    },
+    {
+      "slot": 46,
+      "paper_id": "03efbece-6e53-4dcb-806f-572cfae0a8e6",
+      "doi": "10.1017/s0305000926100828",
+      "doi_normalized": "10.1017/s0305000926100828",
+      "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+      "source_name": "Journal of Child Language",
+      "issn": "0305-0009",
+      "title": "To bind or not to bind: Individual differences in pronominal processing among adolescent Mandarin-English heritage speakers",
+      "abstract_sha256": "a083d82e384a983a8c212fea45cbfcd4613751e73d873cbc7e8e8222782fad19",
+      "has_abstract": true
+    },
+    {
+      "slot": 47,
+      "paper_id": "e68ced6c-ff1a-4b8c-8d17-c35b57111288",
+      "doi": "10.1017/s0305000926100841",
+      "doi_normalized": "10.1017/s0305000926100841",
+      "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+      "source_name": "Journal of Child Language",
+      "issn": "0305-0009",
+      "title": "Semantic composition and pragmatic reasoning in preschool children’s interpretation of negated gradable adjectives",
+      "abstract_sha256": "4fe43d5433f4286d1b16351f22375d6dcfcb605cf92ee0fefe2a2a52350b9019",
+      "has_abstract": true
+    },
+    {
+      "slot": 48,
+      "paper_id": "e686093a-0393-40cb-973b-76bf3bc80bfd",
+      "doi": "10.1017/s0305000926100853",
+      "doi_normalized": "10.1017/s0305000926100853",
+      "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+      "source_name": "Journal of Child Language",
+      "issn": "0305-0009",
+      "title": "Disentangling Bilingualism and Developmental Language Disorder in the Acquisition of Spanish Verbal Agreement Morphology",
+      "abstract_sha256": "9099666209e8389cb654c4201866dd62117af79f86fc6a1f06a0434c32a45393",
+      "has_abstract": true
+    },
+    {
+      "slot": 49,
+      "paper_id": "d1fc2707-3b7f-4636-b9d9-205d8095de03",
+      "doi": "10.1017/s0305000926100889",
+      "doi_normalized": "10.1017/s0305000926100889",
+      "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+      "source_name": "Journal of Child Language",
+      "issn": "0305-0009",
+      "title": "Cross-Linguistic and Socioeconomic Differences in the Use of Variation Sets in Children’s Communicative Environments",
+      "abstract_sha256": "8106bd5a7d0a729a73ed2c8fbcf14529263f87b30b0d0834c5c1f555ec396f5b",
+      "has_abstract": true
+    },
+    {
+      "slot": 50,
+      "paper_id": "8dd6e110-6f6c-4519-92f7-dbd0c32f8939",
+      "doi": "10.1017/s0305000926100981",
+      "doi_normalized": "10.1017/s0305000926100981",
+      "source_id": "e25f5d0d-21ef-4796-bdd2-e880179f2379",
+      "source_name": "Journal of Child Language",
+      "issn": "0305-0009",
+      "title": "Inflectional Morphology Development and Its Association With Parental Input: Evidence From Kannada-Speaking Preschool Children",
+      "abstract_sha256": "088c4be7672142551207b34c527ac9167034904bd04825613d15cbcef811121c",
+      "has_abstract": true
+    }
+  ]
+}

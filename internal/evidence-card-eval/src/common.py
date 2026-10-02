@@ -72,6 +72,10 @@ def sha256_obj(obj) -> str:
     return hashlib.sha256(canonical_bytes(obj)).hexdigest()
 
 
+def sha256_bytes(b: bytes) -> str:
+    return hashlib.sha256(b).hexdigest()
+
+
 def normalize_ws(text: str) -> str:
     """Collapse all whitespace runs to single spaces and trim, for substring checks."""
     return re.sub(r"\s+", " ", text).strip()

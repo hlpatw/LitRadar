@@ -1,0 +1,15 @@
+{
+  "evaluator_version": "1.0.0",
+  "prompt_version": "prompt-abstract-v1",
+  "status": "NOT_EXECUTED",
+  "n_model_cards": 0,
+  "n_gold_cards": 0,
+  "note": "No model evidence cards found under model-dir. Model run was not executed; no metrics are fabricated. See data/model_run.status.json.",
+  "gates": {
+    "G1_plumbing": "NOT_RUN",
+    "G2_evidence_localization": "NOT_RUN",
+    "G3_numeric_accuracy": "NOT_RUN",
+    "G4_appropriate_unknown": "NOT_RUN",
+    "G5_per_field_accuracy": "NOT_RUN"
+  }
+}
