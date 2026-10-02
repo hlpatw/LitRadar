@@ -285,7 +285,15 @@ export default function Notes() {
               </div>
               <div className="mt-3 flex items-center gap-3 text-[11.5px] text-muted-foreground">
                 {note.paper && (
-                  <span className="truncate">📄 {note.paper.title}</span>
+                  <a
+                    href={`/papers/${note.paper.id}`}
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
+                    }}
+                    className="truncate text-primary hover:underline"
+                  >
+                    📄 {note.paper.title}
+                  </a>
                 )}
                 <span className="shrink-0">
                   {formatDate(note.updatedAt)}

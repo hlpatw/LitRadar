@@ -8,6 +8,7 @@ import type {
   PaperDetail as PaperDetailType,
   FavoriteItem,
   ChecklistItem,
+  NoteItem,
   UpdatePaperRequest,
 } from '@shared/api.interface';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,7 @@ const PaperDetailPage: React.FC = () => {
   const [togglingTodo, setTogglingTodo] = React.useState<boolean>(false);
   const [noteDraft, setNoteDraft] = React.useState<string>('');
   const [savingNote, setSavingNote] = React.useState<boolean>(false);
+  const [notes, setNotes] = React.useState<NoteItem[]>([]);
 
   // Edit dialog
   const [editOpen, setEditOpen] = React.useState<boolean>(false);
@@ -73,16 +75,19 @@ const PaperDetailPage: React.FC = () => {
       papers.getPaperDetail(id),
       workspace.getFavorites(),
       workspace.getChecklist(),
+      workspace.getNotes(),
     ])
       .then(
-        ([paperData, favs, checklist]: [
+        ([paperData, favs, checklist, allNotes]: [
           PaperDetailType,
           FavoriteItem[],
           ChecklistItem[],
+          NoteItem[],
         ]) => {
           setPaper(paperData);
           setFavorites(favs);
           setInChecklist(checklist.some((c) => c.paperId === id));
+          setNotes(allNotes.filter((n: NoteItem) => n.paperId === id));
           setLoading(false);
         },
       )
@@ -146,6 +151,8 @@ const PaperDetailPage: React.FC = () => {
     try {
       await workspace.createNote({ paperId: paper.id, content: noteDraft.trim() });
       setNoteDraft('');
+      const allNotes = await workspace.getNotes();
+      setNotes(allNotes.filter((n: NoteItem) => n.paperId === paper.id));
       toast.success('笔记已保存');
     } catch (err: unknown) {
       logger.error('保存笔记失败', err);
@@ -428,6 +435,21 @@ const PaperDetailPage: React.FC = () => {
         <h2 className="font-serif text-[24px] font-bold leading-[1.4] tracking-[-0.005em] max-sm:text-[20px]">
           笔记
         </h2>
+        {notes.length > 0 && (
+          <ul className="mt-3 space-y-2">
+            {notes.map((n: NoteItem) => (
+              <li
+                key={n.id}
+                className="rounded-[8px] border border-[var(--border)] bg-[var(--background)] p-3 text-[14px] leading-[1.6] whitespace-pre-wrap"
+              >
+                {n.content}
+                <span className="mt-1 block font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--muted-foreground)]">
+                  {new Date(n.updatedAt).toLocaleString('zh-CN')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
         <Textarea
           value={noteDraft}
           onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
