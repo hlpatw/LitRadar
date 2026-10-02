@@ -9,6 +9,20 @@ import { AppModule } from './app.module';
 import { runUp } from './database/migrator';
 
 async function bootstrap() {
+  const isProd = process.env.NODE_ENV === 'production';
+
+  // Fail fast in production if no database is configured. Without this, main.ts would
+  // skip migrations below AND DatabaseModule builds a lazy pool, so the app would boot
+  // and serve /api/version (which swallows DB errors) while zero tables existed and
+  // every data endpoint failed — a silent half-deploy. Local dev without a DB still
+  // boots (NODE_ENV != production).
+  if (isProd && !process.env.DATABASE_URL) {
+    throw new Error(
+      'DATABASE_URL is required in production: refusing to boot without a database. ' +
+        'Attach a Postgres and set the DATABASE_URL service variable.',
+    );
+  }
+
   // B3: apply pending migrations before serving traffic. Tracks state in _migrations so a
   // fresh DB builds fully and an existing DB only applies deltas. Single source of truth
   // (no separate deploy/migration.sql fork at runtime).
