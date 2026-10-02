@@ -130,6 +130,7 @@ export const userNotes = pgTable('user_notes', {
   userId: varchar('user_id', { length: 100 }).notNull(),
   content: text('content').notNull(),
   paperId: uuid('paper_id'),
+  tags: text('tags').array().notNull().default([]),
   createdAt: timestamp('_created_at', { precision: 3, withTimezone: true })
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
@@ -249,3 +250,62 @@ export const sourceSyncRuns = pgTable('source_sync_runs', {
 
 export const sourceAliasesTable = sourceAliases;
 export const sourceSyncRunsTable = sourceSyncRuns;
+
+// ── 0008: weekly radar, behavior events, scheduler state ─────────────────────
+
+// Freeze one deterministic Top10 (+ aggregates) per ISO week. The dashboard reads the
+// frozen row for the current (and previous) week rather than re-scoring live.
+export const weeklyRadarSnapshots = pgTable('weekly_radar_snapshots', {
+  weekStart: date('week_start').primaryKey(),
+  newPaperCount: integer('new_paper_count').notNull().default(0),
+  top10: jsonb('top10').$type<RadarTop10Item[]>().notNull().default([]),
+  sourceDistribution: jsonb('source_distribution').$type<{ source: string; count: number }[]>().notNull().default([]),
+  keywordHits: jsonb('keyword_hits').$type<{ keyword: string; count: number }[]>().notNull().default([]),
+  generatedAt: timestamp('generated_at', { precision: 3, withTimezone: true })
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+});
+
+export interface RadarTop10Item {
+  rank: number;
+  paperId: string;
+  title: string;
+  source: string | null;
+  publishedDate: string | null;
+  url: string | null;
+  hasAbstract: boolean;
+  score: number;
+  matchedKeywords: string[];
+  reasons: string[];
+}
+
+// Append-only, user-scoped, idempotent analytics. UNIQUE(user_id,event_type,key)
+// dedupes retried intents. Never stores note body text.
+export const behaviorEvents = pgTable('behavior_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id', { length: 100 }).notNull(),
+  paperId: uuid('paper_id'),
+  eventType: varchar('event_type', { length: 30 }).notNull(),
+  idempotencyKey: varchar('idempotency_key', { length: 200 }).notNull(),
+  createdAt: timestamp('created_at', { precision: 3, withTimezone: true })
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+}, (table) => [
+  uniqueIndex('behavior_events_dedupe_ux').on(table.userId, table.eventType, table.idempotencyKey),
+  index('behavior_events_user_idx').on(table.userId, table.createdAt),
+  index('behavior_events_type_idx').on(table.eventType, table.createdAt),
+]);
+
+// Singleton scheduler bookkeeping (id always 1).
+export const schedulerState = pgTable('scheduler_state', {
+  id: integer('id').primaryKey(),
+  paused: boolean('paused').notNull().default(false),
+  lastRunAt: timestamp('last_run_at', { precision: 3, withTimezone: true }),
+  nextRunAt: timestamp('next_run_at', { precision: 3, withTimezone: true }),
+  runCount: integer('run_count').notNull().default(0),
+  lastMessage: text('last_message'),
+});
+
+export const weeklyRadarSnapshotsTable = weeklyRadarSnapshots;
+export const behaviorEventsTable = behaviorEvents;
+export const schedulerStateTable = schedulerState;

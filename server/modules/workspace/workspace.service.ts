@@ -556,6 +556,7 @@ export class WorkspaceService {
         content: r.user_notes.content,
         paperId: r.user_notes.paperId,
         paper: r.papers ? mapPaper(r.papers) : null,
+        tags: r.user_notes.tags ?? [],
         createdAt: r.user_notes.createdAt.toISOString(),
         updatedAt: r.user_notes.updatedAt.toISOString(),
       }),
@@ -572,6 +573,7 @@ export class WorkspaceService {
         userId,
         content: dto.content,
         paperId: dto.paperId ?? null,
+        tags: dto.tags ?? [],
       })
       .returning();
 
@@ -580,6 +582,7 @@ export class WorkspaceService {
       content: inserted.content,
       paperId: inserted.paperId,
       paper: null,
+      tags: inserted.tags ?? [],
       createdAt: inserted.createdAt.toISOString(),
       updatedAt: inserted.updatedAt.toISOString(),
     };
@@ -602,6 +605,7 @@ export class WorkspaceService {
     const patch: Record<string, unknown> = {};
     if (dto.content !== undefined) patch.content = dto.content;
     if (dto.paperId !== undefined) patch.paperId = dto.paperId;
+    if (dto.tags !== undefined) patch.tags = dto.tags;
 
     if (Object.keys(patch).length === 0) {
       throw new BadRequestException('未提供可更新字段');
@@ -621,6 +625,7 @@ export class WorkspaceService {
       content: updated.content,
       paperId: updated.paperId,
       paper: null,
+      tags: updated.tags ?? [],
       createdAt: updated.createdAt.toISOString(),
       updatedAt: updated.updatedAt.toISOString(),
     };

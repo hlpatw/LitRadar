@@ -33,7 +33,7 @@ async function main() {
   const { Client } = await import('pg');
   const boot = new Client({ connectionString: conn });
   await boot.connect();
-  for (const m of ['0000_base.up.sql', '0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql', '0005_user_library.up.sql', '0006_source_detail_indexes.up.sql', '0007_source_running_ux.up.sql']) {
+  for (const m of ['0000_base.up.sql', '0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql', '0005_user_library.up.sql', '0006_source_detail_indexes.up.sql', '0007_source_running_ux.up.sql', '0008_radar_events_scheduler.up.sql']) {
     await boot.query(f(join(migDir, m)));
   }
   await boot.end();
@@ -458,6 +458,85 @@ async function main() {
       throw new Error('no run should be running now, got runningRun=' + JSON.stringify(detailAfter.data.runningRun));
     console.log('[ok] source detail terminal lastRun fields populated; runningRun=null:',
       JSON.stringify({ status: detailAfter.data.lastRunStatus, ins: detailAfter.data.lastRunInserted, upd: detailAfter.data.lastRunUpdated }));
+
+    // ── (D) WEEKLY RADAR (deterministic snapshot) ──────────────────────────
+    // Regular user GETs the radar; it lazily freezes the current ISO-Week snapshot.
+    const radar1 = await call('GET', '/api/radar/current', token);
+    if (radar1.status !== 200 || !radar1.data.current) throw new Error('radar current -> ' + radar1.status);
+    if (!Array.isArray(radar1.data.current.items)) throw new Error('radar items not array');
+    console.log('[ok] GET /api/radar/current -> week', radar1.data.current.weekStart, 'items=' + radar1.data.current.items.length);
+
+    // POST /generate must be ADMIN-only: a regular user gets 403.
+    const genForbidden = await call('POST', '/api/radar/generate', token);
+    if (genForbidden.status !== 403) throw new Error('non-admin radar generate expected 403, got ' + genForbidden.status);
+    console.log('[ok] non-admin POST /api/radar/generate -> 403');
+
+    // Admin regenerate for the SAME week is a no-op and the order must be byte-stable.
+    const gen2 = await call('POST', '/api/radar/generate', adminToken);
+    if (gen2.status !== 200 && gen2.status !== 201) throw new Error('admin radar generate -> ' + gen2.status);
+    const radar2 = await call('GET', '/api/radar/current', token);
+    if (radar2.data.current.weekStart !== radar1.data.current.weekStart)
+      throw new Error('weekStart changed between deterministic snapshots');
+    const order1 = radar1.data.current.items.map((i: any) => i.paper.id).join(',');
+    const order2 = radar2.data.current.items.map((i: any) => i.paper.id).join(',');
+    if (order1 !== order2) throw new Error('radar order is not deterministic across regeneration');
+    for (const it of radar2.data.current.items ?? []) {
+      if (!Array.isArray(it.reasons) || !Array.isArray(it.matchedKeywords)) throw new Error('radar item missing reasons/keywords');
+      if (it.paper.journalName === undefined || it.paper.publishedDate === undefined) throw new Error('radar item missing source/date');
+    }
+    console.log('[ok] radar deterministic: same weekStart + identical order after admin regenerate');
+
+    // ── (E) WEEKLY DIGEST ───────────────────────────────────────────────────
+    const digest = await call('GET', '/api/digest/current', token);
+    if (digest.status !== 200) throw new Error('digest -> ' + digest.status);
+    for (const k of ['newPaperCount', 'top10', 'sourceDistribution', 'keywordHits', 'userActionCounts']) {
+      if (digest.data[k] === undefined) throw new Error('digest missing ' + k);
+    }
+    if (!Array.isArray(digest.data.top10)) throw new Error('digest top10 not array');
+    console.log('[ok] GET /api/digest/current -> new=' + digest.data.newPaperCount, 'top10=' + digest.data.top10.length, 'actions=' + JSON.stringify(digest.data.userActionCounts));
+
+    // ── (F) BEHAVIOR EVENTS (idempotent, no note text) ──────────────────────
+    const ev1 = await call('POST', '/api/events', token, { eventType: 'favorite', paperId: adminPaperId, idempotencyKey: 'test-key-1' });
+    if (ev1.status !== 200 && ev1.status !== 201) throw new Error('event first POST -> ' + ev1.status);
+    if (ev1.data.recorded !== true) throw new Error('event first should recorded=true, got ' + JSON.stringify(ev1.data));
+    const ev2 = await call('POST', '/api/events', token, { eventType: 'favorite', paperId: adminPaperId, idempotencyKey: 'test-key-1' });
+    if (ev2.status !== 200 && ev2.status !== 201) throw new Error('duplicate event status -> ' + ev2.status);
+    if (ev2.data.recorded !== false) throw new Error('duplicate event should be deduped (recorded=false), got ' + JSON.stringify(ev2.data));
+    console.log('[ok] behavior event idempotent: first recorded=true, duplicate recorded=false');
+    // unknown event type -> 400
+    const badEv = await call('POST', '/api/events', token, { eventType: 'note_body_attempt', paperId: adminPaperId });
+    if (badEv.status !== 400) throw new Error('unknown event type expected 400, got ' + badEv.status);
+    // admin summary present (internal metrics)
+    const evSum = await call('GET', '/api/events/admin/summary', adminToken);
+    if (evSum.status !== 200 || typeof evSum.data.total !== 'number') throw new Error('event admin summary -> ' + evSum.status);
+    console.log('[ok] event admin summary total=' + evSum.data.total);
+
+    // ── (G) NOTES TAGS ───────────────────────────────────────────────────────
+    const taggedNote = await call('POST', '/api/workspace/notes', token, { content: 'note with tags', tags: ['priming', 'syntax'] });
+    if (taggedNote.status !== 200 && taggedNote.status !== 201) throw new Error('tagged note create -> ' + taggedNote.status);
+    if (!Array.isArray(taggedNote.data.tags) || taggedNote.data.tags.length !== 2) throw new Error('note tags not persisted: ' + JSON.stringify(taggedNote.data));
+    console.log('[ok] note tags persisted:', JSON.stringify(taggedNote.data.tags));
+
+    // ── (H) SCHEDULER GATES (staging-only) ──────────────────────────────────
+    // In this e2e env APP_ENV is not 'staging' and SCHEDULER_ENABLED is unset -> disabled.
+    const sch0 = await call('GET', '/api/admin/scheduler', adminToken);
+    if (sch0.status !== 200) throw new Error('scheduler status -> ' + sch0.status);
+    if (sch0.data.enabled !== false) throw new Error('scheduler must be disabled without APP_ENV=staging+SCHEDULER_ENABLED, got ' + sch0.data.enabled);
+    if (sch0.data.readySourceCount !== 7) throw new Error('expected exactly 7 ready sources, got ' + sch0.data.readySourceCount);
+    console.log('[ok] scheduler disabled by default; readySourceCount=' + sch0.data.readySourceCount);
+
+    // pause/resume round-trip works even when disabled (state is just bookkeeping).
+    const paused = await call('PUT', '/api/admin/scheduler', adminToken, { paused: true });
+    if (paused.status !== 200 || paused.data.paused !== true) throw new Error('scheduler pause -> ' + JSON.stringify(paused.data));
+    const resumed = await call('PUT', '/api/admin/scheduler', adminToken, { paused: false });
+    if (resumed.status !== 200 || resumed.data.paused !== false) throw new Error('scheduler resume -> ' + JSON.stringify(resumed.data));
+    console.log('[ok] scheduler pause/resume round-trip');
+
+    // run-once when disabled -> ran=false, reason=disabled (no sync performed).
+    const once = await call('POST', '/api/admin/scheduler/run-once', adminToken);
+    if (once.status !== 200 && once.status !== 201) throw new Error('run-once status -> ' + once.status);
+    if (once.data.ran !== false) throw new Error('disabled run-once should report ran=false, got ' + JSON.stringify(once.data));
+    console.log('[ok] scheduler run-once while disabled -> ran=false (' + once.data.reason + ')');
 
     console.log('\n=== E2E FLOW REGRESSION PASSED ===');
   } finally {

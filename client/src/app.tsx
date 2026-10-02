@@ -13,6 +13,8 @@ import Library from './pages/Library/Library';
 import AdminSources from './pages/Admin/AdminSources';
 import Notes from './pages/Notes/Notes';
 import Settings from './pages/Settings/Settings';
+import Digest from './pages/Digest/Digest';
+import SchedulerAdmin from './pages/SchedulerAdmin/SchedulerAdmin';
 import LoginPage from './pages/Login/LoginPage';
 import RegisterPage from './pages/Register/RegisterPage';
 import { useAuth } from '@/contexts/AuthContext';
@@ -50,6 +52,8 @@ const RoutesComponent = () => {
         <Route path="library" element={<Library />} />
         <Route path="checklist" element={<Navigate to="/library?status=todo" replace />} />
         <Route path="admin/sources" element={<AdminSources />} />
+        <Route path="admin/scheduler" element={<SchedulerAdmin />} />
+        <Route path="digest" element={<Digest />} />
         <Route path="notes" element={<Notes />} />
         <Route path="settings" element={<Settings />} />
       </Route>

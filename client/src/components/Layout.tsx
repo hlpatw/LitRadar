@@ -12,6 +12,8 @@ import {
   LogOut,
   BookMarked,
   ShieldCheck,
+  Newspaper,
+  Timer,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -21,18 +23,22 @@ const baseNavItems = [
   { path: '/journals', label: '期刊与会议', icon: Library },
   { path: '/papers', label: '论文浏览', icon: FileText },
   { path: '/library', label: '我的书架', icon: BookMarked },
+  { path: '/digest', label: '每周文摘', icon: Newspaper },
   { path: '/notes', label: '笔记', icon: StickyNote },
   { path: '/settings', label: '设置', icon: Settings },
 ];
 
 const adminNavItem = { path: '/admin/sources', label: '来源管理', icon: ShieldCheck };
+const adminSchedulerItem = { path: '/admin/scheduler', label: '采集调度', icon: Timer };
 
 const Layout = () => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const navItems = user?.isAdmin ? [...baseNavItems, adminNavItem] : baseNavItems;
+  const navItems = user?.isAdmin
+    ? [...baseNavItems, adminNavItem, adminSchedulerItem]
+    : baseNavItems;
 
   const handleLogout = () => {
     logout();

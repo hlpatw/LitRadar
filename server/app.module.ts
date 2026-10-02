@@ -13,6 +13,10 @@ import { SourcesModule } from './modules/sources/sources.module';
 import { ConnectorsModule } from './modules/connectors/connectors.module';
 import { HealthModule } from './modules/health/health.module';
 import { VersionModule } from './modules/version/version.module';
+import { RadarModule } from './modules/radar/radar.module';
+import { EventsModule } from './modules/events/events.module';
+import { DigestModule } from './modules/digest/digest.module';
+import { SchedulerModule } from './modules/scheduler/scheduler.module';
 
 @Module({
   imports: [
@@ -27,6 +31,10 @@ import { VersionModule } from './modules/version/version.module';
     ConnectorsModule,
     HealthModule,
     VersionModule,
+    RadarModule,
+    EventsModule,
+    DigestModule,
+    SchedulerModule,
   ],
   providers: [
     {

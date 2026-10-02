@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as api from '@/api';
+import RadarSection from '@/components/RadarSection';
 import type { Overview, OverviewRun } from '@shared/api.interface';
 import {
   Library,
@@ -92,6 +93,9 @@ const Dashboard: React.FC = () => {
               ))}
         </div>
       </section>
+
+      {/* Weekly research radar (dashboard-first) */}
+      {!loading && <RadarSection />}
 
       {/* Weekly / sync summary */}
       <section className="mt-8 grid grid-cols-1 gap-[14px] md:grid-cols-2">

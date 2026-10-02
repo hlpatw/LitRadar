@@ -60,7 +60,11 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-sm:max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 max-w-lg",
+          // Responsive shared-modal standard: a flex column capped at 85vh so it never
+          // overflows small/zoomed viewports. The header + sticky footer stay put while
+          // <DialogBody> scrolls internally. Width: full-bleed on mobile (375), fixed max
+          // at >=768. Radix provides focus-trap + ESC-to-close automatically.
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 flex w-[calc(100vw-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] flex-col gap-4 rounded-lg border bg-white p-6 shadow-lg duration-200 max-h-[85dvh] sm:w-full",
           className
         )}
         {...props}
@@ -77,6 +81,18 @@ function DialogContent({
         )}
       </DialogPrimitive.Content>
     </DialogPortal>
+  )
+}
+
+// Scrollable modal region: place long form content here. The header above and footer
+// below remain fixed; this middle block scrolls on its own (internal scrolling).
+function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-body"
+      className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1", className)}
+      {...props}
+    />
   )
 }
 
@@ -133,6 +149,7 @@ export {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogBody,
   DialogDescription,
   DialogFooter,
   DialogHeader,

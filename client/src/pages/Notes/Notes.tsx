@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, type FormEvent, type KeyboardEvent } from 'react';
 import { toast } from 'sonner';
-import { PlusIcon, Trash2Icon, StickyNoteIcon } from 'lucide-react';
+import { PlusIcon, Trash2Icon, StickyNoteIcon, XIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogBody,
   DialogClose,
 } from '@/components/ui/dialog';
 import {
@@ -50,19 +52,50 @@ function NoteForm({
 }) {
   const [content, setContent] = useState<string>('');
   const [paperId, setPaperId] = useState<string>('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState<string>('');
+  const [fieldError, setFieldError] = useState<string | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
 
   useEffect(() => {
     if (open) {
       setContent(initial?.content ?? '');
       setPaperId(initial?.paperId ?? '');
+      setTags(initial?.tags ?? []);
+      setTagInput('');
+      setFieldError(null);
     }
   }, [open, initial]);
+
+  const addTag = () => {
+    const t = tagInput.trim().replace(/,+$/, '');
+    if (!t) return;
+    if (tags.includes(t)) {
+      setTagInput('');
+      return;
+    }
+    if (tags.length >= 8) {
+      setFieldError('最多 8 个标签');
+      return;
+    }
+    setTags([...tags, t]);
+    setTagInput('');
+    setFieldError(null);
+  };
+
+  const onTagKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addTag();
+    } else if (e.key === 'Backspace' && !tagInput && tags.length) {
+      setTags(tags.slice(0, -1));
+    }
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!content.trim()) {
-      toast.error('请输入笔记内容');
+      setFieldError('请输入笔记内容');
       return;
     }
     setSaving(true);
@@ -70,6 +103,7 @@ function NoteForm({
       await onSave({
         content: content.trim(),
         paperId: paperId || undefined,
+        tags,
       });
       onClose();
     } catch (err: unknown) {
@@ -85,49 +119,79 @@ function NoteForm({
 
   return (
     <Dialog open={open} onOpenChange={(v: boolean) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? '编辑笔记' : '新建笔记'}</DialogTitle>
           <DialogDescription>
             {isEdit ? '修改笔记内容与关联论文' : '记下你的研究灵感'}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="font-mono text-[10.5px] tracking-[0.06em] uppercase text-muted-foreground">
-                内容
-              </label>
-              <Textarea
-                value={content}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                  setContent(e.target.value)
-                }
-                placeholder="写点想法…"
-                rows={4}
-                required
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="font-mono text-[10.5px] tracking-[0.06em] uppercase text-muted-foreground">
-                关联论文
-              </label>
-              <Select value={paperId} onValueChange={setPaperId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="选择论文（可选）" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">不关联</SelectItem>
-                  {papers.map((p: PaperItem) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.title}
-                    </SelectItem>
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-0">
+          <DialogBody>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono text-[10.5px] tracking-[0.06em] uppercase text-muted-foreground">
+                  内容
+                </label>
+                <Textarea
+                  value={content}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                    setContent(e.target.value);
+                    if (fieldError) setFieldError(null);
+                  }}
+                  placeholder="写点想法…"
+                  rows={5}
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono text-[10.5px] tracking-[0.06em] uppercase text-muted-foreground">
+                  关联论文
+                </label>
+                <Select value={paperId} onValueChange={setPaperId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择论文（可选）" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">不关联</SelectItem>
+                    {papers.map((p: PaperItem) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono text-[10.5px] tracking-[0.06em] uppercase text-muted-foreground">
+                  标签
+                </label>
+                <div className="flex flex-wrap items-center gap-1.5 rounded-[8px] border border-[var(--border)] px-2 py-1.5">
+                  {tags.map((t) => (
+                    <span key={t} className="inline-flex items-center gap-1 rounded-[6px] bg-[var(--accent)] px-2 py-0.5 text-[12px] text-[var(--accent-foreground)]">
+                      {t}
+                      <button type="button" onClick={() => setTags(tags.filter((x) => x !== t))} className="opacity-60 hover:opacity-100">
+                        <XIcon className="size-3" />
+                      </button>
+                    </span>
                   ))}
-                </SelectContent>
-              </Select>
+                  <Input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={onTagKey}
+                    onBlur={addTag}
+                    placeholder={tags.length ? '继续添加…' : '输入后回车添加标签'}
+                    className="h-7 flex-1 border-0 shadow-none focus-visible:ring-0"
+                  />
+                </div>
+                {fieldError && (
+                  <p className="text-[12px] text-destructive">{fieldError}</p>
+                )}
+              </div>
             </div>
-          </div>
-          <DialogFooter className="mt-6">
+          </DialogBody>
+          <DialogFooter className="mt-4 shrink-0 border-t border-[var(--border)] pt-4">
             <DialogClose asChild>
               <Button variant="outline" type="button">
                 取消
@@ -299,6 +363,15 @@ export default function Notes() {
                   {formatDate(note.updatedAt)}
                 </span>
               </div>
+              {note.tags && note.tags.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {note.tags.map((t) => (
+                    <span key={t} className="rounded-[6px] bg-[var(--accent)] px-1.5 py-0.5 text-[11px] text-[var(--accent-foreground)]">
+                      #{t}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>

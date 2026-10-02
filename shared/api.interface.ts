@@ -54,6 +54,7 @@ export interface NoteItem {
   content: string;
   paperId: string | null;
   paper: PaperItem | null;
+  tags: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -140,11 +141,13 @@ export interface UpdateChecklistRequest {
 export interface CreateNoteRequest {
   content: string;
   paperId?: string;
+  tags?: string[];
 }
 
 export interface UpdateNoteRequest {
   content?: string;
   paperId?: string;
+  tags?: string[];
 }
 
 export interface CreateFavoriteRequest {
@@ -272,4 +275,90 @@ export interface SourcePaperItem extends PaperItem {
 
 export interface SourcePaperListResponse extends PaginatedResponse<SourcePaperItem> {
   source: SourceDetail;
+}
+
+// ── Weekly research radar (deterministic weekly snapshot) ─────────────────────
+
+export interface RadarPaper {
+  id: string;
+  title: string;
+  journalName: string | null;
+  publishedDate: string | null;
+  url: string | null;
+  hasAbstract: boolean;
+}
+
+export interface RadarTopItem {
+  rank: number;
+  paper: RadarPaper;
+  score: number;
+  matchedKeywords: string[];
+  reasons: string[];
+}
+
+export interface WeeklyRadarSnapshot {
+  weekStart: string;            // ISO Monday date (yyyy-mm-dd)
+  isCurrent: boolean;
+  newPaperCount: number;
+  items: RadarTopItem[];
+  sourceDistribution: { source: string; count: number }[];
+  keywordHits: { keyword: string; count: number }[];
+  generatedAt: string;
+}
+
+export interface RadarHistoryResponse {
+  current: WeeklyRadarSnapshot | null;
+  previous: WeeklyRadarSnapshot | null;
+}
+
+// ── Weekly digest ─────────────────────────────────────────────────────────────
+
+export interface WeeklyDigest {
+  weekStart: string;
+  newPaperCount: number;
+  top10: RadarTopItem[];
+  sourceDistribution: { source: string; count: number }[];
+  keywordHits: { keyword: string; count: number }[];
+  userActionCounts: Record<BehaviorEventType, number>;
+  generatedAt: string;
+}
+
+// ── Behavior events (idempotent, user-scoped; no note text) ───────────────────
+
+export type BehaviorEventType =
+  | 'impression'
+  | 'detail'
+  | 'library'
+  | 'todo'
+  | 'favorite'
+  | 'uninterested'
+  | 'note';
+
+export interface TrackEventRequest {
+  eventType: BehaviorEventType;
+  paperId?: string | null;
+  /** Client-supplied dedupe key. When omitted the server derives a deterministic one. */
+  idempotencyKey?: string;
+}
+
+export interface EventAdminSummary {
+  total: number;
+  byType: Record<BehaviorEventType, number>;
+  last24h: number;
+}
+
+// ── Scheduler (staging-only) ──────────────────────────────────────────────────
+
+export interface SchedulerStatus {
+  enabled: boolean;             // false in production / when not staging
+  paused: boolean;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  runCount: number;
+  readySourceCount: number;
+  lastMessage: string | null;
+}
+
+export interface SetSchedulerPausedRequest {
+  paused: boolean;
 }
