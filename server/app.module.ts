@@ -6,6 +6,7 @@ import { GlobalExceptionFilter } from './common/filters/exception.filter';
 import { JournalsModule } from './modules/journals/journals.module';
 import { PapersModule } from './modules/papers/papers.module';
 import { WorkspaceModule } from './modules/workspace/workspace.module';
+import { LibraryModule } from './modules/library/library.module';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { SourcesModule } from './modules/sources/sources.module';
@@ -21,6 +22,7 @@ import { VersionModule } from './modules/version/version.module';
     JournalsModule,
     PapersModule,
     WorkspaceModule,
+    LibraryModule,
     SourcesModule,
     ConnectorsModule,
     HealthModule,

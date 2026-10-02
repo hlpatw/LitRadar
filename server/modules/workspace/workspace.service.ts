@@ -13,6 +13,7 @@ import {
   userNotes,
   readingChecklist,
   userSettings,
+  userLibrary,
   papers,
   journals,
   sourceSyncRuns,
@@ -33,6 +34,7 @@ import type {
   PaperDetail,
   Overview,
   OverviewRun,
+  ReadingState,
 } from '@shared/api.interface';
 
 function mapPaper(p: typeof papers.$inferSelect): PaperItem {
@@ -52,13 +54,35 @@ function mapPaper(p: typeof papers.$inferSelect): PaperItem {
   };
 }
 
+// Reading-state <-> legacy checklist status mapping. The authority stores todo|reading|read;
+// the legacy checklist API speaks todo|in_progress|done.
+const STATE_TO_LEGACY: Record<ReadingState, ChecklistItem['status']> = {
+  todo: 'todo',
+  reading: 'in_progress',
+  read: 'done',
+};
+const LEGACY_TO_STATE: Record<string, ReadingState> = {
+  todo: 'todo',
+  in_progress: 'reading',
+  done: 'read',
+};
+
+function toLegacyStatus(s: ReadingState | null): ChecklistItem['status'] {
+  if (!s) return 'todo';
+  return STATE_TO_LEGACY[s];
+}
+function fromLegacyStatus(s: string | null | undefined): ReadingState {
+  if (s && LEGACY_TO_STATE[s]) return LEGACY_TO_STATE[s];
+  return 'todo';
+}
+
 @Injectable()
 export class WorkspaceService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
   ) {}
 
-  // ── Dashboard ──
+  // ── Dashboard (all counts read the single user_library authority) ──
 
   async getDashboard(userId: string): Promise<DashboardStats> {
     const [
@@ -73,24 +97,24 @@ export class WorkspaceService {
       this.db.select({ count: count() }).from(papers),
       this.db
         .select({ count: count() })
-        .from(userFavorites)
-        .where(eq(userFavorites.userId, userId)),
+        .from(userLibrary)
+        .where(and(eq(userLibrary.userId, userId), eq(userLibrary.isFavorite, true))),
       this.db
         .select({ count: count() })
-        .from(readingChecklist)
+        .from(userLibrary)
         .where(
           and(
-            eq(readingChecklist.userId, userId),
-            eq(readingChecklist.status, 'todo'),
+            eq(userLibrary.userId, userId),
+            eq(userLibrary.readingState, 'todo'),
           ),
         ),
       this.db
         .select({ count: count() })
-        .from(readingChecklist)
+        .from(userLibrary)
         .where(
           and(
-            eq(readingChecklist.userId, userId),
-            eq(readingChecklist.status, 'done'),
+            eq(userLibrary.userId, userId),
+            eq(userLibrary.readingState, 'read'),
           ),
         ),
       this.db
@@ -161,100 +185,184 @@ export class WorkspaceService {
     };
   }
 
-  // ── Favorites ──
+  // ── Favorites (legacy API backed by user_library authority) ──
 
   async listFavorites(userId: string): Promise<FavoriteItem[]> {
     const rows = await this.db
       .select()
-      .from(userFavorites)
-      .leftJoin(papers, eq(userFavorites.paperId, papers.id))
-      .where(eq(userFavorites.userId, userId))
-      .orderBy(desc(userFavorites.createdAt));
+      .from(userLibrary)
+      .leftJoin(papers, eq(userLibrary.paperId, papers.id))
+      .where(
+        and(eq(userLibrary.userId, userId), eq(userLibrary.isFavorite, true)),
+      )
+      .orderBy(desc(userLibrary.addedAt));
 
     return rows.map(
       (r: {
-        user_favorites: typeof userFavorites.$inferSelect;
+        user_library: typeof userLibrary.$inferSelect;
         papers: typeof papers.$inferSelect | null;
       }) => ({
-        id: r.user_favorites.id,
-        paperId: r.user_favorites.paperId,
+        id: r.user_library.id,
+        paperId: r.user_library.paperId,
         paper: r.papers ? mapPaper(r.papers) : (null as unknown as PaperItem),
-        createdAt: r.user_favorites.createdAt.toISOString(),
+        createdAt: r.user_library.addedAt.toISOString(),
       }),
     );
   }
 
   async addFavorite(userId: string, paperId: string): Promise<void> {
+    const [paper] = await this.db
+      .select({ id: papers.id })
+      .from(papers)
+      .where(eq(papers.id, paperId))
+      .limit(1);
+    if (!paper) throw new NotFoundException('论文不存在');
+
+    // Upsert the single (user,paper) row; flipping is_favorite on.
     await this.db
-      .insert(userFavorites)
-      .values({ userId, paperId })
-      .onConflictDoNothing();
+      .insert(userLibrary)
+      .values({ userId, paperId, isFavorite: true, createdBy: userId, updatedBy: userId })
+      .onConflictDoUpdate({
+        target: [userLibrary.userId, userLibrary.paperId],
+        set: { isFavorite: true, updatedAt: new Date(), updatedBy: userId },
+      });
   }
 
   async removeFavorite(userId: string, paperId: string): Promise<void> {
-    const existing = await this.db
-      .select({ id: userFavorites.id })
-      .from(userFavorites)
+    // Clear the favorite flag. If the row now carries no reading state and no tags, it is an
+    // empty association -> delete it so the paper can re-enter recommendations.
+    const [row] = await this.db
+      .select()
+      .from(userLibrary)
       .where(
-        and(
-          eq(userFavorites.userId, userId),
-          eq(userFavorites.paperId, paperId),
-        ),
-      );
-
-    if (existing.length === 0) {
-      throw new NotFoundException('收藏记录不存在');
-    }
+        and(eq(userLibrary.userId, userId), eq(userLibrary.paperId, paperId)),
+      )
+      .limit(1);
+    if (!row) return; // already not associated -> idempotent success.
 
     await this.db
-      .delete(userFavorites)
-      .where(
-        and(
-          eq(userFavorites.userId, userId),
-          eq(userFavorites.paperId, paperId),
-        ),
-      );
+      .update(userLibrary)
+      .set({ isFavorite: false, updatedAt: new Date(), updatedBy: userId })
+      .where(and(eq(userLibrary.userId, userId), eq(userLibrary.paperId, paperId)));
+
+    if (
+      row.readingState === null &&
+      (row.personalTags === null || row.personalTags.trim() === '')
+    ) {
+      await this.db
+        .delete(userLibrary)
+        .where(and(eq(userLibrary.userId, userId), eq(userLibrary.paperId, paperId)));
+    }
   }
 
-  // ── Checklist ──
+  // ── Checklist (paper-linked rows live in user_library; orphan free-text rows stay in
+  //    reading_checklist because they are not paper associations) ──
 
   async listChecklist(userId: string): Promise<ChecklistItem[]> {
-    const rows = await this.db
+    // paper-linked from the authority
+    const libRows = await this.db
+      .select()
+      .from(userLibrary)
+      .leftJoin(papers, eq(userLibrary.paperId, papers.id))
+      .where(
+        and(
+          eq(userLibrary.userId, userId),
+          sql`${userLibrary.readingState} IS NOT NULL`,
+        ),
+      )
+      .orderBy(asc(userLibrary.addedAt));
+
+    // orphan free-text entries (paper_id IS NULL) from the legacy table
+    const orphanRows = await this.db
       .select()
       .from(readingChecklist)
-      .leftJoin(papers, eq(readingChecklist.paperId, papers.id))
-      .where(eq(readingChecklist.userId, userId))
-      .orderBy(
-        asc(readingChecklist.sortOrder),
-        asc(readingChecklist.createdAt),
-      );
+      .where(
+        and(
+          eq(readingChecklist.userId, userId),
+          sql`${readingChecklist.paperId} IS NULL`,
+        ),
+      )
+      .orderBy(asc(readingChecklist.sortOrder), asc(readingChecklist.createdAt));
 
-    return rows.map(
+    const paperLinked: ChecklistItem[] = libRows.map(
       (r: {
-        reading_checklist: typeof readingChecklist.$inferSelect;
+        user_library: typeof userLibrary.$inferSelect;
         papers: typeof papers.$inferSelect | null;
       }) => ({
-        id: r.reading_checklist.id,
-        paperId: r.reading_checklist.paperId,
-        titleOverride: r.reading_checklist.titleOverride,
-        status: r.reading_checklist.status as ChecklistItem['status'],
-        sortOrder: r.reading_checklist.sortOrder,
+        id: r.user_library.id,
+        paperId: r.user_library.paperId,
+        titleOverride: null,
+        status: toLegacyStatus(r.user_library.readingState),
+        sortOrder: 0,
         paper: r.papers ? mapPaper(r.papers) : null,
-        createdAt: r.reading_checklist.createdAt.toISOString(),
-        updatedAt: r.reading_checklist.updatedAt.toISOString(),
+        createdAt: r.user_library.addedAt.toISOString(),
+        updatedAt: r.user_library.updatedAt.toISOString(),
       }),
     );
+
+    const orphans: ChecklistItem[] = orphanRows.map(
+      (r: typeof readingChecklist.$inferSelect): ChecklistItem => ({
+        id: r.id,
+        paperId: null,
+        titleOverride: r.titleOverride,
+        status: r.status as ChecklistItem['status'],
+        sortOrder: r.sortOrder,
+        paper: null,
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+      }),
+    );
+
+    return [...orphans, ...paperLinked];
   }
 
   async createChecklistItem(
     userId: string,
     dto: CreateChecklistRequest,
   ): Promise<ChecklistItem> {
+    // Linked to a real paper -> upsert the authority row.
+    if (dto.paperId) {
+      const [paper] = await this.db
+        .select({ id: papers.id })
+        .from(papers)
+        .where(eq(papers.id, dto.paperId))
+        .limit(1);
+      if (!paper) throw new NotFoundException('论文不存在');
+
+      const state = fromLegacyStatus(dto.status);
+      const [row] = await this.db
+        .insert(userLibrary)
+        .values({
+          userId,
+          paperId: dto.paperId,
+          readingState: state,
+          createdBy: userId,
+          updatedBy: userId,
+        })
+        .onConflictDoUpdate({
+          target: [userLibrary.userId, userLibrary.paperId],
+          set: { readingState: state, updatedAt: new Date(), updatedBy: userId },
+        })
+        .returning();
+
+      return {
+        id: row.id,
+        paperId: row.paperId,
+        titleOverride: null,
+        status: toLegacyStatus(row.readingState),
+        sortOrder: 0,
+        paper: null,
+        createdAt: row.addedAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    }
+
+    // Free-text orphan entry -> legacy reading_checklist (not a paper association).
     const [inserted] = await this.db
       .insert(readingChecklist)
       .values({
         userId,
-        paperId: dto.paperId ?? null,
+        paperId: null,
         titleOverride: dto.titleOverride ?? null,
         status: dto.status ?? 'todo',
       })
@@ -262,7 +370,7 @@ export class WorkspaceService {
 
     return {
       id: inserted.id,
-      paperId: inserted.paperId,
+      paperId: null,
       titleOverride: inserted.titleOverride,
       status: inserted.status as ChecklistItem['status'],
       sortOrder: inserted.sortOrder,
@@ -277,28 +385,55 @@ export class WorkspaceService {
     id: string,
     dto: UpdateChecklistRequest,
   ): Promise<ChecklistItem> {
-    const [existing] = await this.db
-      .select({ userId: readingChecklist.userId })
-      .from(readingChecklist)
-      .where(eq(readingChecklist.id, id));
+    // Route by id: paper-linked rows live in user_library; orphans in reading_checklist.
+    const [libRow] = await this.db
+      .select()
+      .from(userLibrary)
+      .where(and(eq(userLibrary.id, id), eq(userLibrary.userId, userId)))
+      .limit(1);
 
-    if (!existing || existing.userId !== userId) {
-      throw new NotFoundException('阅读清单记录不存在');
+    if (libRow) {
+      const patch: Record<string, unknown> = {};
+      if (dto.status !== undefined) patch.readingState = fromLegacyStatus(dto.status);
+      if (Object.keys(patch).length === 0) {
+        throw new BadRequestException('未提供可更新字段');
+      }
+      patch.updatedAt = new Date();
+      patch.updatedBy = userId;
+      const [updated] = await this.db
+        .update(userLibrary)
+        .set(patch as typeof userLibrary.$inferInsert)
+        .where(eq(userLibrary.id, id))
+        .returning();
+      return {
+        id: updated.id,
+        paperId: updated.paperId,
+        titleOverride: null,
+        status: toLegacyStatus(updated.readingState),
+        sortOrder: 0,
+        paper: null,
+        createdAt: updated.addedAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      };
     }
+
+    const [orphan] = await this.db
+      .select()
+      .from(readingChecklist)
+      .where(and(eq(readingChecklist.id, id), eq(readingChecklist.userId, userId)))
+      .limit(1);
+    if (!orphan) throw new NotFoundException('阅读清单记录不存在');
 
     const patch: Record<string, unknown> = {};
     if (dto.paperId !== undefined) patch.paperId = dto.paperId;
     if (dto.titleOverride !== undefined) patch.titleOverride = dto.titleOverride;
     if (dto.status !== undefined) patch.status = dto.status;
     if (dto.sortOrder !== undefined) patch.sortOrder = dto.sortOrder;
-
     if (Object.keys(patch).length === 0) {
       throw new BadRequestException('未提供可更新字段');
     }
-
     patch.updatedAt = new Date();
     patch.updatedBy = userId;
-
     const [updated] = await this.db
       .update(readingChecklist)
       .set(patch as typeof readingChecklist.$inferInsert)
@@ -318,19 +453,38 @@ export class WorkspaceService {
   }
 
   async deleteChecklistItem(userId: string, id: string): Promise<void> {
-    const [existing] = await this.db
-      .select({ userId: readingChecklist.userId })
-      .from(readingChecklist)
-      .where(eq(readingChecklist.id, id));
-
-    if (!existing || existing.userId !== userId) {
-      throw new NotFoundException('阅读清单记录不存在');
+    const [libRow] = await this.db
+      .select()
+      .from(userLibrary)
+      .where(and(eq(userLibrary.id, id), eq(userLibrary.userId, userId)))
+      .limit(1);
+    if (libRow) {
+      // Removing from the reading list: clear reading state. If the row is otherwise empty
+      // (no favorite, no tags), delete it entirely so the paper can re-enter recommendations.
+      const emptied =
+        libRow.isFavorite === false &&
+        (libRow.personalTags === null || libRow.personalTags.trim() === '');
+      if (emptied) {
+        await this.db.delete(userLibrary).where(eq(userLibrary.id, id));
+      } else {
+        await this.db
+          .update(userLibrary)
+          .set({ readingState: null, updatedAt: new Date(), updatedBy: userId })
+          .where(eq(userLibrary.id, id));
+      }
+      return;
     }
 
+    const [orphan] = await this.db
+      .select({ id: readingChecklist.id })
+      .from(readingChecklist)
+      .where(and(eq(readingChecklist.id, id), eq(readingChecklist.userId, userId)))
+      .limit(1);
+    if (!orphan) throw new NotFoundException('阅读清单记录不存在');
     await this.db.delete(readingChecklist).where(eq(readingChecklist.id, id));
   }
 
-  // ── Notes ──
+  // ── Notes (single table, linked to paper/user; unaffected by library split) ──
 
   async listNotes(userId: string): Promise<NoteItem[]> {
     const rows = await this.db
@@ -432,29 +586,30 @@ export class WorkspaceService {
     await this.db.delete(userNotes).where(eq(userNotes.id, id));
   }
 
-  // ── Settings ──
+  // ── Settings (now also persists per-user recommendation weights) ──
 
-  async getSettings(userId: string): Promise<UserSettings> {
+  async getSettings(userId: string): Promise<UserSettings & { recWeights: Record<string, number> | null }> {
     const [row] = await this.db
       .select()
       .from(userSettings)
       .where(eq(userSettings.userId, userId));
 
     if (!row) {
-      return { id: '', fieldOfStudy: null, interestedKeywords: null };
+      return { id: '', fieldOfStudy: null, interestedKeywords: null, recWeights: null };
     }
 
     return {
       id: row.id,
       fieldOfStudy: row.fieldOfStudy,
       interestedKeywords: row.interestedKeywords,
+      recWeights: (row.recWeights as Record<string, number> | null) ?? null,
     };
   }
 
   async updateSettings(
     userId: string,
     dto: UpdateSettingsRequest,
-  ): Promise<UserSettings> {
+  ): Promise<UserSettings & { recWeights: Record<string, number> | null }> {
     const [existing] = await this.db
       .select({ id: userSettings.id })
       .from(userSettings)
@@ -465,6 +620,7 @@ export class WorkspaceService {
       if (dto.fieldOfStudy !== undefined) patch.fieldOfStudy = dto.fieldOfStudy;
       if (dto.interestedKeywords !== undefined)
         patch.interestedKeywords = dto.interestedKeywords;
+      if (dto.recWeights !== undefined) patch.recWeights = dto.recWeights;
       patch.updatedAt = new Date();
       patch.updatedBy = userId;
 
@@ -478,6 +634,7 @@ export class WorkspaceService {
         id: updated.id,
         fieldOfStudy: updated.fieldOfStudy,
         interestedKeywords: updated.interestedKeywords,
+        recWeights: (updated.recWeights as Record<string, number> | null) ?? null,
       };
     }
 
@@ -487,6 +644,7 @@ export class WorkspaceService {
         userId,
         fieldOfStudy: dto.fieldOfStudy ?? null,
         interestedKeywords: dto.interestedKeywords ?? null,
+        recWeights: dto.recWeights ?? null,
       })
       .returning();
 
@@ -494,6 +652,7 @@ export class WorkspaceService {
       id: inserted.id,
       fieldOfStudy: inserted.fieldOfStudy,
       interestedKeywords: inserted.interestedKeywords,
+      recWeights: (inserted.recWeights as Record<string, number> | null) ?? null,
     };
   }
 }

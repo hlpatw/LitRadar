@@ -6,8 +6,7 @@ import {
 } from '@nestjs/common';
 import { DATABASE, type Database } from '../../database/database.module';
 import { eq, and, ilike, count, sql, gte, lte } from 'drizzle-orm';
-import { papers, journals } from '../../database/schema';
-import { isValidUuid, normalizeDoi, isValidDoi } from '../../common/utils/doi.util';
+import { papers, journals } from '../../database/schema';import { isValidUuid, normalizeDoi, isValidDoi } from '../../common/utils/doi.util';
 import type {
   PaperItem,
   PaperDetail,
@@ -58,10 +57,12 @@ export class PapersService {
     if (filters.hasAbstract === true) conditions.push(sql`${papers.abstractText} IS NOT NULL`);
     if (filters.hasAbstract === false) conditions.push(sql`${papers.abstractText} IS NULL`);
     if (filters.favorite && userId) {
-      conditions.push(sql`EXISTS (SELECT 1 FROM user_favorites f WHERE f.paper_id = ${papers.id} AND f.user_id = ${userId})`);
+      // Same authority as the legacy favorites API: user_library.is_favorite.
+      conditions.push(sql`EXISTS (SELECT 1 FROM user_library f WHERE f.paper_id = ${papers.id} AND f.user_id = ${userId} AND f.is_favorite = true)`);
     }
     if (filters.todo && userId) {
-      conditions.push(sql`EXISTS (SELECT 1 FROM reading_checklist c WHERE c.paper_id = ${papers.id} AND c.user_id = ${userId})`);
+      // Same authority as the legacy checklist API: user_library.reading_state = 'todo'.
+      conditions.push(sql`EXISTS (SELECT 1 FROM user_library c WHERE c.paper_id = ${papers.id} AND c.user_id = ${userId} AND c.reading_state = 'todo')`);
     }
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;

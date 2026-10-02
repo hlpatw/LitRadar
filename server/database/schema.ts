@@ -1,7 +1,9 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   date,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -143,6 +145,8 @@ export const userSettings = pgTable('user_settings', {
   userId: varchar('user_id', { length: 100 }).notNull().unique(),
   fieldOfStudy: text('field_of_study'),
   interestedKeywords: text('interested_keywords'),
+  // Per-user configurable recommendation weights (JSONB). NULL => service defaults.
+  recWeights: jsonb('rec_weights').$type<Record<string, number>>(),
   createdAt: timestamp('_created_at', { precision: 3, withTimezone: true })
     .notNull()
     .default(sql`CURRENT_TIMESTAMP`),
@@ -159,6 +163,56 @@ export const readingChecklistTable = readingChecklist;
 export const userFavoritesTable = userFavorites;
 export const userNotesTable = userNotes;
 export const userSettingsTable = userSettings;
+
+// ── 0005: authoritative per-user-per-paper library ──────────────────────────
+// The single source of truth for "this user associated this paper". A row exists whenever the
+// user has saved/favorited the paper OR tracks it through a reading state. UNIQUE(user_id,paper_id)
+// guarantees one row per user per paper; legacy favorites/checklist were backmerged into it.
+export const userLibrary = pgTable('user_library', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id', { length: 100 }).notNull(),
+  paperId: uuid('paper_id').notNull(),
+  isFavorite: boolean('is_favorite').notNull().default(false),
+  // null | 'todo' | 'reading' | 'read'
+  readingState: varchar('reading_state', { length: 20 }),
+  personalTags: text('personal_tags'),
+  addedAt: timestamp('added_at', { precision: 3, withTimezone: true })
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  createdAt: timestamp('_created_at', { precision: 3, withTimezone: true })
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  createdBy: varchar('_created_by', { length: 100 }),
+  updatedAt: timestamp('_updated_at', { precision: 3, withTimezone: true })
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  updatedBy: varchar('_updated_by', { length: 100 }),
+}, (table) => [
+  uniqueIndex('user_library_user_paper_ux').on(table.userId, table.paperId),
+  index('user_library_user_idx').on(table.userId),
+  index('user_library_state_idx').on(table.userId, table.readingState),
+]);
+
+// Negative / recommendation feedback, deliberately OUTSIDE the library: marking a paper
+// "uninterested" must not create a saved association. Excludes it from recommendations.
+export const userRecommendationFeedback = pgTable('user_recommendation_feedback', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: varchar('user_id', { length: 100 }).notNull(),
+  paperId: uuid('paper_id').notNull(),
+  feedbackType: varchar('feedback_type', { length: 30 }).notNull().default('uninterested'),
+  note: text('note'),
+  createdAt: timestamp('_created_at', { precision: 3, withTimezone: true })
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  createdBy: varchar('_created_by', { length: 100 }),
+  updatedAt: timestamp('_updated_at', { precision: 3, withTimezone: true })
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+  updatedBy: varchar('_updated_by', { length: 100 }),
+}, (table) => [
+  uniqueIndex('user_reco_feedback_ux').on(table.userId, table.paperId, table.feedbackType),
+  index('user_reco_feedback_user_idx').on(table.userId),
+]);
 // Phase-1: extensible source aliases / venue lineage (former names, ISSNs, parent venues).
 export const sourceAliases = pgTable('source_aliases', {
   id: uuid('id').primaryKey().defaultRandom(),

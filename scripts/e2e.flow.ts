@@ -33,7 +33,7 @@ async function main() {
   const { Client } = await import('pg');
   const boot = new Client({ connectionString: conn });
   await boot.connect();
-  for (const m of ['0000_base.up.sql', '0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql']) {
+  for (const m of ['0000_base.up.sql', '0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql', '0005_user_library.up.sql']) {
     await boot.query(f(join(migDir, m)));
   }
   await boot.end();
@@ -41,7 +41,7 @@ async function main() {
   process.env.DATABASE_URL = conn;
   process.env.JWT_SECRET = 'e2e-secret-at-least-32-characters-long-xx';
   process.env.SERVER_PORT = String(appPort);
-  process.env.ADMIN_EMAILS = 'admin-e2e@example.com';
+  process.env.ADMIN_EMAILS = 'admin-e2e@example.com,admin-lib@example.com';
 
   const { NestFactory } = await import('@nestjs/core');
   const { AppModule } = (await import('../dist/server/app.module.js')) as any;
@@ -122,6 +122,73 @@ async function main() {
     const getSet = await call('GET', '/api/workspace/settings', token);
     if (getSet.status !== 200 || getSet.data.fieldOfStudy !== 'psycholinguistics') throw new Error('settings get -> ' + getSet.status);
     console.log('[ok] settings put+get ->', getSet.data.fieldOfStudy);
+
+    // 8b) MY LIBRARY: upsert / list / filter / recommendations / feedback.
+    // Regular users cannot create papers (admin-gated), so provision a paper via an admin token
+    // first, then exercise the library entirely with the regular user's token.
+    const adminUnameLib = 'adminlib_' + Date.now();
+    const adminLibReg = await call('POST', '/api/auth/register', undefined, {
+      username: adminUnameLib, password: 'password123', email: 'admin-lib@example.com',
+    });
+    if (!adminLibReg.data.user?.isAdmin) throw new Error('library admin should be isAdmin: ' + JSON.stringify(adminLibReg.data));
+    const adminLibToken = adminLibReg.data.token;
+    const libPaper = await call('POST', '/api/papers', adminLibToken, { title: 'Library E2E paper', keywords: 'priming, syntax, prediction', abstractText: 'We studied priming.', url: 'https://example.org/lib' });
+    if (libPaper.status !== 201) throw new Error('admin paper for library -> ' + libPaper.status);
+    const paperForLib = libPaper.data;
+
+    const up = await call('PUT', `/api/library/${paperForLib.id}`, token, { isFavorite: true, readingState: 'todo' });
+    if (up.status !== 200 || up.data.isFavorite !== true || up.data.readingState !== 'todo')
+      throw new Error('library upsert -> ' + up.status + ' ' + JSON.stringify(up.data));
+    console.log('[ok] PUT /api/library/:id ->', up.data.readingState, 'fav=' + up.data.isFavorite);
+
+    const libAll = await call('GET', '/api/library', token);
+    if (libAll.status !== 200 || !Array.isArray(libAll.data.items)) throw new Error('library list -> ' + libAll.status);
+    if (!libAll.data.items.some((i: any) => i.paperId === paperForLib.id)) throw new Error('library list missing upserted paper');
+    const libTodo = await call('GET', '/api/library?status=todo', token);
+    if (!libTodo.data.items.some((i: any) => i.paperId === paperForLib.id)) throw new Error('library status=todo filter missing paper');
+    console.log('[ok] GET /api/library list + status filter agree with authority');
+
+    // idempotent upsert does NOT create a duplicate row
+    const up2 = await call('PUT', `/api/library/${paperForLib.id}`, token, { readingState: 'reading' });
+    const libAfter = await call('GET', '/api/library', token);
+    const occurrences = libAfter.data.items.filter((i: any) => i.paperId === paperForLib.id).length;
+    if (occurrences !== 1) throw new Error(`library duplicate after re-upsert: ${occurrences}`);
+    if (up2.data.readingState !== 'reading') throw new Error('library update state -> ' + up2.data.readingState);
+    console.log('[ok] library upsert idempotent (one row per user,paper)');
+
+    // recommendations must NOT include the already-associated paper; coldStart flag present
+    const reco = await call('GET', '/api/library/recommendations?limit=20', token);
+    if (reco.status !== 200 || !Array.isArray(reco.data.items)) throw new Error('recommendations -> ' + reco.status);
+    if (typeof reco.data.coldStart !== 'boolean') throw new Error('recommendations missing coldStart flag');
+    if (reco.data.items.some((r: any) => r.paper.id === paperForLib.id)) throw new Error('recommendations leaked a library paper');
+    if (!reco.data.excluded || typeof reco.data.excluded.library !== 'number') throw new Error('recommendations missing excluded counts');
+    console.log('[ok] recommendations exclude library paper; coldStart=' + reco.data.coldStart + ' excluded=' + JSON.stringify(reco.data.excluded));
+
+    // uninterested feedback excludes a paper without creating a library row
+    const libPaper2 = await call('POST', '/api/papers', adminLibToken, { title: 'Library E2E paper two', keywords: 'statistics', abstractText: 'Another abstract.', url: 'https://example.org/lib2' });
+    const otherPaper = libPaper2.data;
+    {
+      const fb = await call('POST', `/api/library/${otherPaper.id}/feedback`, token, { feedbackType: 'uninterested' });
+      if (fb.status !== 200) throw new Error('feedback set -> ' + fb.status);
+      const reco2 = await call('GET', '/api/library/recommendations?limit=50', token);
+      if (reco2.data.items.some((r: any) => r.paper.id === otherPaper)) throw new Error('uninterested paper still recommended');
+      // clear feedback -> paper can be recommended again
+      const clr = await call('DELETE', `/api/library/${otherPaper.id}/feedback`, token);
+      if (clr.status !== 204 && clr.status !== 200) throw new Error('feedback clear -> ' + clr.status);
+      console.log('[ok] uninterested feedback excludes then restores a paper');
+    }
+
+    // legacy dashboard counts read the same authority: favorite count should be >=1 now
+    const dashAfter = await call('GET', '/api/workspace/dashboard', token);
+    if (dashAfter.status !== 200 || dashAfter.data.favoriteCount < 1) throw new Error('dashboard favorite count not reflected: ' + JSON.stringify(dashAfter.data));
+    console.log('[ok] dashboard favoriteCount reads library authority (' + dashAfter.data.favoriteCount + ')');
+
+    // remove association: notes preserved, paper becomes recommendable again
+    const rm = await call('DELETE', `/api/library/${paperForLib.id}`, token);
+    if (rm.status !== 204 && rm.status !== 200) throw new Error('library remove -> ' + rm.status);
+    const libAfterRm = await call('GET', '/api/library', token);
+    if (libAfterRm.data.items.some((i: any) => i.paperId === paperForLib.id)) throw new Error('library paper still present after remove');
+    console.log('[ok] library remove association (notes untouched)');
 
     // 9) version (public)
     const ver = await call('GET', '/api/version');

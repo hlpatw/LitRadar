@@ -62,6 +62,7 @@ export interface UserSettings {
   id: string;
   fieldOfStudy: string | null;
   interestedKeywords: string | null;
+  recWeights?: Record<string, number> | null;
 }
 
 export interface DashboardStats {
@@ -152,4 +153,74 @@ export interface CreateFavoriteRequest {
 export interface UpdateSettingsRequest {
   fieldOfStudy?: string;
   interestedKeywords?: string;
+  recWeights?: Record<string, number> | null;
+}
+
+// ── My Library (authoritative per-user-per-paper) ───────────────────────────
+
+export type ReadingState = 'todo' | 'reading' | 'read';
+
+export interface LibraryItem {
+  id: string;
+  paperId: string;
+  isFavorite: boolean;
+  readingState: ReadingState | null;
+  personalTags: string | null;
+  addedAt: string;
+  paper: PaperDetail | null;
+  noteCount: number;
+}
+
+export interface LibraryListResponse {
+  items: LibraryItem[];
+  total: number;
+}
+
+export interface UpsertLibraryRequest {
+  isFavorite?: boolean;
+  readingState?: ReadingState | null;
+  personalTags?: string | null;
+}
+
+export interface SetFeedbackRequest {
+  feedbackType?: 'uninterested';
+  note?: string;
+}
+
+// ── Explainable recommendations (in-database, no LLM) ──────────────────────────
+
+export interface RecWeights {
+  interest: number;
+  lexical: number;
+  source: number;
+  freshness: number;
+  abstract: number;
+}
+
+export const DEFAULT_REC_WEIGHTS: RecWeights = {
+  interest: 0.3,
+  lexical: 0.25,
+  source: 0.15,
+  freshness: 0.15,
+  abstract: 0.15,
+};
+
+export interface RecommendationItem {
+  paper: PaperDetail;
+  score: number;
+  breakdown: {
+    interest: number;
+    lexical: number;
+    source: number;
+    freshness: number;
+    abstract: number;
+  };
+  reasons: string[];
+}
+
+export interface RecommendationResponse {
+  items: RecommendationItem[];
+  coldStart: boolean;
+  weights: RecWeights;
+  excluded: { library: number; uninterested: number };
 }
