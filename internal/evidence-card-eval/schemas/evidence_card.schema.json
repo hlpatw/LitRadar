@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://litradar.local/schemas/evidence_card.v1.json",
+  "title": "LitRadar Abstract Evidence Card",
+  "description": "One structured evidence card per sampled paper, extracted ONLY from the abstract. Every asserted value must be backed by a verbatim abstract sentence. This is an offline evaluation artifact; it never touches the running app.",
+  "type": "object",
+  "schema_version": "1.0.0",
+  "required": [
+    "schema_version",
+    "paper_id",
+    "doi",
+    "source_id",
+    "source_name",
+    "abstract_sha256",
+    "model_version",
+    "prompt_version",
+    "card_status",
+    "fields"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Bump when field set or per-field provenance shape changes."
+    },
+    "paper_id": { "type": "string", "description": "Staging papers.id (UUID)." },
+    "doi": { "type": ["string", "null"], "description": "Stable DOI; preferred cross-paper key." },
+    "source_id": { "type": "string", "description": "Staging sources.id (UUID) of the ready source." },
+    "source_name": { "type": "string" },
+    "abstract_sha256": {
+      "type": "string",
+      "description": "SHA-256 of the exact abstract_text string the extraction was run against, for provenance."
+    },
+    "model_version": {
+      "type": ["string", "null"],
+      "description": "Model + version that produced the card, e.g. 'gpt-4o-2024-08-06'. null when model run NOT EXECUTED."
+    },
+    "prompt_version": {
+      "type": "string",
+      "description": "Version tag of prompt.md the model was given, e.g. 'prompt-abstract-v1'."
+    },
+    "card_status": {
+      "type": "string",
+      "enum": ["extracted", "human_annotated", "not_run", "failed"]
+    },
+    "fields": {
+      "type": "object",
+      "description": "The ten extraction fields. Keys are fixed; do not rename without bumping schema_version.",
+      "required": [
+        "research_question",
+        "method_paradigm",
+        "sample_population",
+        "sample_size",
+        "material_language",
+        "independent_variable",
+        "dependent_variable",
+        "main_findings",
+        "author_conclusion",
+        "author_limitations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "research_question": { "$ref": "#/$defs/field" },
+        "method_paradigm": { "$ref": "#/$defs/field" },
+        "sample_population": { "$ref": "#/$defs/field" },
+        "sample_size": {
+          "allOf": [{ "$ref": "#/$defs/field" }],
+          "description": "Numeric field: value SHOULD be a number (participant N) when known."
+        },
+        "material_language": { "$ref": "#/$defs/field" },
+        "independent_variable": { "$ref": "#/$defs/field" },
+        "dependent_variable": { "$ref": "#/$defs/field" },
+        "main_findings": { "$ref": "#/$defs/field" },
+        "author_conclusion": { "$ref": "#/$defs/field" },
+        "author_limitations": { "$ref": "#/$defs/field" }
+      }
+    }
+  },
+  "$defs": {
+    "field": {
+      "type": "object",
+      "description": "Per-field extraction result with provenance and origin separation.",
+      "required": [
+        "value",
+        "unknown",
+        "evidence_sentence",
+        "source_level",
+        "confidence",
+        "origin",
+        "char_span"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "description": "Normalized extracted value. null when unknown=true. String for free text, number for sample_size, array of strings for multi-label fields.",
+          "anyOf": [
+            { "type": "string" },
+            { "type": "number" },
+            { "type": "array", "items": { "type": "string" } },
+            { "type": "null" }
+          ]
+        },
+        "unknown": {
+          "type": "boolean",
+          "description": "true iff the abstract does not state this field. Model MUST abstain rather than guess."
+        },
+        "evidence_sentence": {
+          "type": "string",
+          "description": "Exact verbatim sentence span copied from the abstract that supports value. Empty string when unknown=true. Must be a substring of the abstract after whitespace normalization."
+        },
+        "source_level": {
+          "type": "string",
+          "const": "abstract",
+          "description": "Hard-coded: this evaluation reads abstracts only. No full-text, no external knowledge."
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "origin": {
+          "type": "string",
+          "enum": ["verbatim", "paraphrased", "inferred", "n/a"],
+          "description": "Origin separation: 'verbatim' = value copied from the abstract sentence; 'paraphrased' = model reworded the abstract's own statement; 'inferred' = model reasoning beyond the abstract (flagged for evaluator); 'n/a' = unknown=true."
+        },
+        "char_span": {
+          "type": ["array", "null"],
+          "description": "[start, end] character offsets of evidence_sentence in the abstract, 0-based half-open. null when unknown=true.",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    }
+  }
+}

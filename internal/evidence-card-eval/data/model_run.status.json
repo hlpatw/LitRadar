@@ -1,0 +1,20 @@
+{
+  "model_run_status": "NOT_EXECUTED",
+  "checked_at": "2026-10-03",
+  "reason": "No authorized LLM/model API key or endpoint was available in this environment. No model extraction was run.",
+  "api_probe": {
+    "env_vars_checked": [
+      "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_KEY",
+      "GEMINI_API_KEY", "GOOGLE_API_KEY", "DEEPSEEK_API_KEY", "MOONSHOT_API_KEY",
+      "DASHSCOPE_API_KEY", "ARK_API_KEY", "VOLC_API_KEY", "LITRADAR_LLM_KEY",
+      "OPENAI_BASE_URL", "OPENAI_API_BASE"
+    ],
+    "result": "none set",
+    "repo_env_files": "no LLM key present"
+  },
+  "model_version": null,
+  "prompt_version": "prompt-abstract-v1",
+  "cards_produced": 0,
+  "instruction": "To run the model later: set an authorized API key, extract cards into data/cards/model/<paper_id>.json conforming to schemas/evidence_card.schema.json, then run src/evaluate.py. Do NOT hand-write or fabricate cards to fill the 50 slots.",
+  "no_fabrication": true
+}
