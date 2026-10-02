@@ -17,6 +17,7 @@ import { RadarModule } from './modules/radar/radar.module';
 import { EventsModule } from './modules/events/events.module';
 import { DigestModule } from './modules/digest/digest.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { SchedulerModule } from './modules/scheduler/scheduler.module';
     EventsModule,
     DigestModule,
     SchedulerModule,
+    MetricsModule,
   ],
   providers: [
     {

@@ -85,9 +85,27 @@ export interface OverviewRun {
   updatedCount: number;
 }
 
+// A recent note surfaced on the ordinary Dashboard, with its paper link.
+// NOTE CONTENT IS TRUNCATED for the research summary; full text lives on /notes.
+export interface DashboardNote {
+  id: string;
+  excerpt: string;
+  paperId: string | null;
+  paperTitle: string | null;
+  paperUrl: string | null;
+  updatedAt: string;
+}
+
 export interface Overview {
   stats: DashboardStats;
-  newThisWeek: number;
+  // Compact research summary (ordinary Dashboard): replaces the global count cards.
+  newThisWeek: number;            // papers fetched during the current ISO Shanghai week
+  interestKeywordHits: number;    // this-week papers matching the user's interested keywords
+  highRelevancePending: number;   // todo backlog papers from P0/P1 ready sources
+  todoBacklog: number;            // total readingState='todo' papers
+  recentNotes: DashboardNote[];   // latest notes, each with its paper link when present
+  // Legacy fields retained for back-compat but NO LONGER rendered on the ordinary Dashboard
+  // (raw sync ops / version details live under admin source management).
   failedRuns: number;
   recentPapers: PaperDetail[];
   recentRuns: OverviewRun[];
@@ -315,12 +333,17 @@ export interface RadarHistoryResponse {
 
 export interface WeeklyDigest {
   weekStart: string;
+  // Deterministic selection: 'current' = this ISO Shanghai week, 'previous' = minus 7 days.
+  weekRef: 'current' | 'previous';
   newPaperCount: number;
   top10: RadarTopItem[];
   sourceDistribution: { source: string; count: number }[];
   keywordHits: { keyword: string; count: number }[];
   userActionCounts: Record<BehaviorEventType, number>;
-  generatedAt: string;
+  // The frozen snapshot's digest timestamp, or null when no snapshot exists for the requested
+  // week (empty report). A normal-user read NEVER mints a snapshot, so null is expected until the
+  // scheduler / admin backfill freezes one.
+  generatedAt: string | null;
 }
 
 // ── Behavior events (idempotent, user-scoped; no note text) ───────────────────
@@ -361,4 +384,42 @@ export interface SchedulerStatus {
 
 export interface SetSchedulerPausedRequest {
   paused: boolean;
+}
+
+// ── Internal metrics (admin-only, behavior-event aggregates) ──────────────────
+// Every conversion exposes its explicit numerator/denominator. `rate` is `null`
+// when the denominator is 0 (zero handling: never a divide-by-zero, never "0%"
+// pretending there was traffic). No note body / free text is ever returned — only
+// event counts and reading-state aggregates.
+
+export interface RatioPoint {
+  numerator: number;
+  denominator: number;
+  rate: number | null; // 0..1 rounded to 4dp; null when denominator === 0
+}
+
+export interface Top10CtrItem {
+  paperId: string;
+  title: string;
+  impressions: number;
+  details: number;
+  ctr: number | null; // detail / impression; null when impressions === 0
+}
+
+export interface InternalMetrics {
+  // CTR for the current frozen Top10: detail opens / impressions.
+  top10Ctr: {
+    overall: RatioPoint;
+    items: Top10CtrItem[];
+  };
+  // Rolling-7d conversion funnel.
+  conversions: {
+    library: RatioPoint;        // library events / impression events
+    todo: RatioPoint;           // todo events / library events
+    uninterested: RatioPoint;    // uninterested events / impression events
+  };
+  // Note creations (behavior events) in the last 7 days.
+  noteCount: number;
+  // Reading conversion over 7d: papers marked read / distinct impressions.
+  readingConversion7d: RatioPoint;
 }

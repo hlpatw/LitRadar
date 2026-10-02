@@ -109,4 +109,27 @@ export class EventsService {
     for (const r of rows) out[r.t] = r.n;
     return out as Record<BehaviorEventType, number>;
   }
+
+  /** Per-user action counts inside a half-open window [start, end). Used by the digest to
+   * report the PREVIOUS week's actions (not just "since now"). */
+  async userActionCountsInWindow(
+    userId: string,
+    start: Date,
+    end: Date,
+  ): Promise<Record<BehaviorEventType, number>> {
+    const rows = await this.db
+      .select({ t: behaviorEvents.eventType, n: count() })
+      .from(behaviorEvents)
+      .where(
+        and(
+          eq(behaviorEvents.userId, userId),
+          gte(behaviorEvents.createdAt, start),
+          sql`${behaviorEvents.createdAt} < ${end}`,
+        ),
+      )
+      .groupBy(behaviorEvents.eventType);
+    const out: Record<string, number> = {};
+    for (const r of rows) out[r.t] = r.n;
+    return out as Record<BehaviorEventType, number>;
+  }
 }

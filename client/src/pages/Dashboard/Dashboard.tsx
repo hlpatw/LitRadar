@@ -2,17 +2,8 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as api from '@/api';
 import RadarSection from '@/components/RadarSection';
-import type { Overview, OverviewRun } from '@shared/api.interface';
-import {
-  Library,
-  FileText,
-  Star,
-  CheckSquare,
-  CheckCircle2,
-  StickyNote,
-  RefreshCw,
-  AlertTriangle,
-} from 'lucide-react';
+import type { Overview, DashboardNote } from '@shared/api.interface';
+import { Sparkles, KeyRound, Flame, Layers, StickyNote } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -46,16 +37,15 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  const cards = loading || !ov
+  // Compact research summary (replaces the old global count cards).
+  const summary = loading || !ov
     ? []
     : [
-        { label: '期刊源', value: ov.stats.journalCount, href: '/journals' },
-        { label: '论文', value: ov.stats.paperCount, href: '/papers' },
-        { label: '收藏', value: ov.stats.favoriteCount, href: '/papers?favorite=1' },
-        { label: '待读', value: ov.stats.checklistTodoCount, href: '/library?status=todo' },
-        { label: '阅读中', value: ov.stats.readingCount, href: '/library?status=reading' },
-        { label: '已读', value: ov.stats.checklistDoneCount, href: '/library?status=read' },
-        { label: '笔记', value: ov.stats.noteCount, href: '/notes' },
+        { label: '本周新增论文', value: ov.newThisWeek, icon: Sparkles, href: '/papers' },
+        { label: '关键词命中', value: ov.interestKeywordHits, icon: KeyRound, href: '/settings' },
+        { label: '高优先待读', value: ov.highRelevancePending, icon: Flame, href: '/library?status=todo' },
+        { label: '待读积压', value: ov.todoBacklog, icon: Layers, href: '/library?status=todo' },
+        { label: '最近笔记', value: ov.stats.noteCount, icon: StickyNote, href: '/notes' },
       ];
 
   return (
@@ -67,55 +57,72 @@ const Dashboard: React.FC = () => {
         Dashboard
       </h1>
 
-      {/* Stat cards */}
+      {/* (1) Weekly research radar Top10 is the FIRST substantive section. */}
+      {!loading && <RadarSection />}
+
+      {/* Compact research summary */}
       <section className="mt-10">
-        <div className="grid grid-cols-1 gap-[14px] sm:grid-cols-2 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-[14px] sm:grid-cols-3 md:grid-cols-5">
           {loading
-            ? Array.from({ length: 7 }).map((_, i: number) => (
-                <div key={i} className="animate-pulse rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-[22px_24px]">
-                  <div className="h-10 w-16 rounded bg-[var(--border)]" />
+            ? Array.from({ length: 5 }).map((_, i: number) => (
+                <div key={i} className="animate-pulse rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-[16px_18px]">
+                  <div className="h-8 w-12 rounded bg-[var(--border)]" />
                 </div>
               ))
-            : cards.map((c) => (
-                <button
-                  key={c.label}
-                  type="button"
-                  onClick={() => navigate(c.href)}
-                  className="block rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-[22px_24px] text-left transition-all hover:-translate-y-0.5 hover:border-[var(--primary)] hover:shadow-sm"
-                >
-                  <span className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--muted-foreground)]">
-                    {c.label}
-                  </span>
-                  <div className="mt-1 font-serif text-[42px] font-bold leading-[1.06] text-[var(--primary)]">
-                    {c.value}
-                  </div>
-                </button>
-              ))}
+            : summary.map((s) => {
+                const Icon = s.icon;
+                return (
+                  <button
+                    key={s.label}
+                    type="button"
+                    onClick={() => navigate(s.href)}
+                    className="block rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-[16px_18px] text-left transition-colors hover:border-[var(--primary)]"
+                  >
+                    <div className="flex items-center gap-1.5 text-[var(--muted-foreground)]">
+                      <Icon size={13} />
+                      <span className="font-mono text-[10.5px] uppercase tracking-[0.06em]">{s.label}</span>
+                    </div>
+                    <div className="mt-1 font-serif text-[28px] font-bold leading-none text-[var(--foreground)]">
+                      {s.value}
+                    </div>
+                  </button>
+                );
+              })}
         </div>
       </section>
 
-      {/* Weekly research radar (dashboard-first) */}
-      {!loading && <RadarSection />}
-
-      {/* Weekly / sync summary */}
-      <section className="mt-8 grid grid-cols-1 gap-[14px] md:grid-cols-2">
-        <div className="rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-[22px_24px]">
-          <div className="flex items-center gap-2 text-[var(--muted-foreground)]">
-            <RefreshCw size={16} />
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.06em]">本周新增论文</span>
-          </div>
-          <div className="mt-2 font-serif text-[36px] font-bold text-[var(--foreground)]">
-            {loading ? '…' : ov?.newThisWeek ?? 0}
-          </div>
+      {/* Recent notes with paper links */}
+      <section className="mt-10 rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-[22px_24px]">
+        <div className="flex items-center justify-between">
+          <h2 className="font-serif text-[24px] font-bold text-[var(--foreground)]">最近笔记</h2>
+          <button type="button" onClick={() => navigate('/notes')} className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--primary)] hover:underline">
+            全部笔记
+          </button>
         </div>
-        <div className="rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-[22px_24px]">
-          <div className="flex items-center gap-2 text-[var(--muted-foreground)]">
-            <AlertTriangle size={16} />
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.06em]">失败的同步</span>
-          </div>
-          <div className="mt-2 font-serif text-[36px] font-bold text-[var(--foreground)]">
-            {loading ? '…' : ov?.failedRuns ?? 0}
-          </div>
+        <div className="mt-4 space-y-2">
+          {loading ? (
+            <p className="text-[var(--muted-foreground)]">加载中…</p>
+          ) : !ov || ov.recentNotes.length === 0 ? (
+            <p className="text-[14.5px] text-[var(--muted-foreground)]">还没有笔记 — 在论文详情页随手记下想法。</p>
+          ) : (
+            ov.recentNotes.map((n: DashboardNote) => (
+              <div key={n.id} className="rounded-md border border-transparent p-2">
+                <p className="text-[14px] leading-[1.5] text-[var(--foreground)]">{n.excerpt}</p>
+                <div className="mt-1 flex items-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--muted-foreground)]">
+                  <span>{new Date(n.updatedAt).toLocaleDateString('zh-CN')}</span>
+                  {n.paperId && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/papers/${n.paperId}`)}
+                      className="text-[var(--primary)] hover:underline"
+                    >
+                      {n.paperTitle ?? '查看论文'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </section>
 
@@ -142,45 +149,6 @@ const Dashboard: React.FC = () => {
               </button>
             ))
           )}
-        </div>
-      </section>
-
-      {/* Recent sync runs */}
-      <section className="mt-8 rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-[22px_24px]">
-        <h2 className="font-serif text-[24px] font-bold text-[var(--foreground)]">最近同步</h2>
-        <div className="mt-4 overflow-auto">
-          <table className="w-full text-left text-[13px]">
-            <thead>
-              <tr className="border-b border-[var(--border)] font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--muted-foreground)]">
-                <th className="py-2 pr-3">来源</th>
-                <th className="py-2 pr-3">状态</th>
-                <th className="py-2 pr-3">新增</th>
-                <th className="py-2 pr-3">更新</th>
-                <th className="py-2">时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={5} className="py-3 text-[var(--muted-foreground)]">加载中…</td></tr>
-              ) : !ov || ov.recentRuns.length === 0 ? (
-                <tr><td colSpan={5} className="py-3 text-[var(--muted-foreground)]">暂无同步记录</td></tr>
-              ) : (
-                ov.recentRuns.map((r: OverviewRun) => (
-                  <tr key={r.id} className="border-b border-[var(--border)] last:border-0">
-                    <td className="py-2 pr-3">{r.sourceName || '—'}</td>
-                    <td className="py-2 pr-3">
-                      <span className={r.status === 'error' ? 'text-red-600' : r.status === 'ok' ? 'text-green-600' : ''}>
-                        {r.status}
-                      </span>
-                    </td>
-                    <td className="py-2 pr-3">{r.insertedCount}</td>
-                    <td className="py-2 pr-3">{r.updatedCount}</td>
-                    <td className="py-2 text-[var(--muted-foreground)]">{new Date(r.startedAt).toLocaleString('zh-CN')}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
         </div>
       </section>
     </div>

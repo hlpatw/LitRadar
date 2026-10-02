@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Newspaper,
   Timer,
+  Gauge,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -30,6 +31,7 @@ const baseNavItems = [
 
 const adminNavItem = { path: '/admin/sources', label: '来源管理', icon: ShieldCheck };
 const adminSchedulerItem = { path: '/admin/scheduler', label: '采集调度', icon: Timer };
+const adminMetricsItem = { path: '/admin/metrics', label: '内部指标', icon: Gauge };
 
 const Layout = () => {
   const [collapsed, setCollapsed] = useState(false);
@@ -37,7 +39,7 @@ const Layout = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const navItems = user?.isAdmin
-    ? [...baseNavItems, adminNavItem, adminSchedulerItem]
+    ? [...baseNavItems, adminNavItem, adminSchedulerItem, adminMetricsItem]
     : baseNavItems;
 
   const handleLogout = () => {

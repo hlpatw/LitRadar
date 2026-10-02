@@ -239,6 +239,22 @@ export class RadarService {
   }
 
   /**
+   * Read a FROZEN snapshot by its week key (yyyy-mm-dd) WITHOUT any write/backfill.
+   * Returns null when no row exists yet. Used by read-only surfaces (digest, admin metrics)
+   * that must never mint a snapshot on behalf of a normal user.
+   */
+  async readSnapshotByKey(weekKey: string): Promise<WeeklyRadarSnapshot | null> {
+    const [row] = await this.db
+      .select()
+      .from(weeklyRadarSnapshots)
+      .where(eq(weeklyRadarSnapshots.weekStart, weekKey))
+      .limit(1);
+    if (!row) return null;
+    const isCurrent = weekKey === weekStartKey(isoWeekStart());
+    return this.toSnapshot(row, isCurrent);
+  }
+
+  /**
    * Current week (lazy-generated, deterministic) PLUS the previous frozen week for history.
    * Boot-safe: if the previous ISO-Shanghai week has no frozen row yet, we deterministically
    * backfill one from the REAL corpus rather than returning `previous: null`. No papers are

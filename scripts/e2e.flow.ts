@@ -553,6 +553,28 @@ async function main() {
     if (!Array.isArray(digest.data.top10)) throw new Error('digest top10 not array');
     console.log('[ok] GET /api/digest/current -> new=' + digest.data.newPaperCount, 'top10=' + digest.data.top10.length, 'actions=' + JSON.stringify(digest.data.userActionCounts));
 
+    // Digest weekRef + read-only contract.
+    if (digest.data.weekRef !== 'current') throw new Error('digest/current must set weekRef=current, got ' + digest.data.weekRef);
+    if (digest.data.generatedAt !== null && typeof digest.data.generatedAt !== 'string')
+      throw new Error('digest generatedAt must be string or null');
+
+    // Previous-week digest: deterministic key = current - 7 days; valid shape; read-only.
+    const digPrev1 = await call('GET', '/api/digest/previous', token);
+    if (digPrev1.status !== 200) throw new Error('digest/previous -> ' + digPrev1.status);
+    if (digPrev1.data.weekRef !== 'previous') throw new Error('digest/previous must set weekRef=previous');
+    for (const k of ['newPaperCount', 'top10', 'sourceDistribution', 'keywordHits', 'userActionCounts']) {
+      if (digPrev1.data[k] === undefined) throw new Error('digest previous missing ' + k);
+    }
+    const dCurMon = new Date(digest.data.weekStart + 'T00:00:00Z');
+    const dPrevMon = new Date(digPrev1.data.weekStart + 'T00:00:00Z');
+    const dDiff = Math.round((dCurMon.getTime() - dPrevMon.getTime()) / 86400000);
+    if (dDiff !== 7) throw new Error(`digest previous week must be exactly 7 days before current (cur=${digest.data.weekStart} prev=${digPrev1.data.weekStart})`);
+    // Read-only: a second read must NOT change the (possibly null) frozen digest timestamp.
+    const digPrev2 = await call('GET', '/api/digest/previous', token);
+    if (digPrev2.data.generatedAt !== digPrev1.data.generatedAt)
+      throw new Error('digest previous read mutated the snapshot (generatedAt changed between reads)');
+    console.log('[ok] GET /api/digest/previous -> week', digPrev1.data.weekStart, 'read-only (generatedAt stable=' + digPrev1.data.generatedAt + ')');
+
     // ── (F) BEHAVIOR EVENTS (idempotent, no note text) ──────────────────────
     const ev1 = await call('POST', '/api/events', token, { eventType: 'favorite', paperId: adminPaperId, idempotencyKey: 'test-key-1' });
     if (ev1.status !== 200 && ev1.status !== 201) throw new Error('event first POST -> ' + ev1.status);
@@ -568,6 +590,31 @@ async function main() {
     const evSum = await call('GET', '/api/events/admin/summary', adminToken);
     if (evSum.status !== 200 || typeof evSum.data.total !== 'number') throw new Error('event admin summary -> ' + evSum.status);
     console.log('[ok] event admin summary total=' + evSum.data.total);
+
+    // ── (F2) INTERNAL METRICS (admin-only, behavior-event aggregates) ──────────
+    // Ordinary user -> 403 (route redirects client-side, API enforces).
+    const metricsForbidden = await call('GET', '/api/admin/metrics', token);
+    if (metricsForbidden.status !== 403) throw new Error('non-admin internal metrics expected 403, got ' + metricsForbidden.status);
+    console.log('[ok] non-admin GET /api/admin/metrics -> 403');
+
+    const metrics = await call('GET', '/api/admin/metrics', adminToken);
+    if (metrics.status !== 200) throw new Error('admin internal metrics -> ' + metrics.status + ' ' + JSON.stringify(metrics.data));
+    const m = metrics.data;
+    // Every conversion carries explicit numerator/denominator + nullable rate.
+    for (const p of [m.top10Ctr.overall, m.conversions.library, m.conversions.todo, m.conversions.uninterested, m.readingConversion7d]) {
+      if (typeof p.numerator !== 'number' || typeof p.denominator !== 'number')
+        throw new Error('metric point missing numerator/denominator: ' + JSON.stringify(m));
+      if (p.rate !== null && typeof p.rate !== 'number') throw new Error('metric rate must be number or null');
+    }
+    if (!Array.isArray(m.top10Ctr.items)) throw new Error('top10Ctr.items must be array');
+    for (const it of m.top10Ctr.items) {
+      if (typeof it.paperId !== 'string' || typeof it.impressions !== 'number' || typeof it.details !== 'number')
+        throw new Error('top10 ctr item malformed: ' + JSON.stringify(it));
+    }
+    if (typeof m.noteCount !== 'number') throw new Error('noteCount missing');
+    // No note body may leak: the payload must never contain a content field.
+    if (JSON.stringify(m).includes('inline paper-detail note body')) throw new Error('internal metrics leaked note content');
+    console.log('[ok] GET /api/admin/metrics -> 200: CTR=' + JSON.stringify(m.top10Ctr.overall), 'conv=' + JSON.stringify(m.conversions), 'noteCount=' + m.noteCount, 'reading7d=' + JSON.stringify(m.readingConversion7d));
 
     // Explicit-key contract: impression <week>:impression:<surface>:<paperId> dedupes on
     // refresh; detail dedupes per paper/week; library records only the first time; note

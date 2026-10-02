@@ -11,6 +11,7 @@ import Papers from './pages/Papers/Papers';
 import PaperDetail from './pages/Papers/PaperDetail';
 import Library from './pages/Library/Library';
 import AdminSources from './pages/Admin/AdminSources';
+import InternalMetrics from './pages/Admin/InternalMetrics';
 import Notes from './pages/Notes/Notes';
 import Settings from './pages/Settings/Settings';
 import Digest from './pages/Digest/Digest';
@@ -53,6 +54,7 @@ const RoutesComponent = () => {
         <Route path="checklist" element={<Navigate to="/library?status=todo" replace />} />
         <Route path="admin/sources" element={<AdminSources />} />
         <Route path="admin/scheduler" element={<SchedulerAdmin />} />
+        <Route path="admin/metrics" element={<InternalMetrics />} />
         <Route path="digest" element={<Digest />} />
         <Route path="notes" element={<Notes />} />
         <Route path="settings" element={<Settings />} />

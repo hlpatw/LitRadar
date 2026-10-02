@@ -36,6 +36,22 @@ import type {
   ReadingState,
 } from '@shared/api.interface';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
+import { isoWeekStart, addWeeks } from '../radar/radar.service';
+
+// Split a free-form interested-keyword setting into bounded, lowercased terms.
+function splitKeywords(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(/[,;，；\n]+/)
+    .map((t) => t.trim().toLowerCase())
+    .filter((t) => t.length >= 2 && t.length <= 60)
+    .slice(0, 12);
+}
+
+function truncate(text: string, max: number): string {
+  const t = (text ?? '').replace(/\s+/g, ' ').trim();
+  return t.length > max ? t.slice(0, max - 1) + '…' : t;
+}
 
 function mapPaper(p: typeof papers.$inferSelect): PaperItem {
   return {
@@ -146,16 +162,56 @@ export class WorkspaceService {
   async getOverview(userId: string): Promise<Overview> {
     const stats = await this.getDashboard(userId);
 
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    // Anchor "this week" to the same ISO Shanghai Monday window as radar/digest so the
+    // dashboard research summary never drifts to a rolling-7d window.
+    const weekStart = isoWeekStart();
+    const weekEnd = addWeeks(weekStart, 1);
+
     const [weekRes] = await this.db
       .select({ n: count() })
       .from(papers)
-      .where(gte(papers.createdAt, weekAgo));
+      .where(and(gte(papers.fetchedAt, weekStart), sql`${papers.fetchedAt} < ${weekEnd}`));
 
-    const [failedRes] = await this.db
+    // Interest / keyword hits: this-week papers whose title/abstract/keywords match the user's
+    // configured interested keywords. Zero when the user has not configured any.
+    const [settingsRow] = await this.db
+      .select()
+      .from(userSettings)
+      .where(eq(userSettings.userId, userId));
+    const terms = splitKeywords(settingsRow?.interestedKeywords);
+    let interestKeywordHits = 0;
+    if (terms.length > 0) {
+      const textExpr = sql`lower(coalesce(${papers.title},'') || ' ' || coalesce(${papers.abstractText},'') || ' ' || coalesce(${papers.keywords},''))`;
+      // drizzle parameterizes each embedded value, so user keywords can't escape the query.
+      const likeConds = terms.map((t) => sql`${textExpr} like ${'%' + t + '%'}`);
+      const orConds = likeConds.slice(1).reduce((acc, c) => sql`${acc} OR ${c}`, likeConds[0]);
+      const [hitRes] = await this.db
+        .select({ n: count() })
+        .from(papers)
+        .where(
+          and(
+            gte(papers.fetchedAt, weekStart),
+            sql`${papers.fetchedAt} < ${weekEnd}`,
+            orConds,
+          ),
+        );
+      interestKeywordHits = hitRes?.n ?? 0;
+    }
+
+    // High-relevance pending: todo backlog papers sourced from P0/P1 ready journals.
+    const [hrRes] = await this.db
       .select({ n: count() })
-      .from(sourceSyncRuns)
-      .where(sql`${sourceSyncRuns.status} = 'error'`);
+      .from(userLibrary)
+      .innerJoin(papers, eq(userLibrary.paperId, papers.id))
+      .innerJoin(journals, eq(papers.journalId, journals.id))
+      .where(
+        and(
+          eq(userLibrary.userId, userId),
+          eq(userLibrary.readingState, 'todo'),
+          eq(journals.connectorStatus, 'ready'),
+          sql`${journals.priority} IN ('P0','P1')`,
+        ),
+      );
 
     const recentRows = await this.db
       .select({ p: papers, jName: journals.name })
@@ -170,6 +226,30 @@ export class WorkspaceService {
         fetchedAt: r.p.fetchedAt ? r.p.fetchedAt.toISOString() : null,
       }),
     );
+
+    // Recent notes with paper links for the dashboard research summary.
+    const noteRows = await this.db
+      .select({ n: userNotes, pTitle: papers.title, pUrl: papers.url })
+      .from(userNotes)
+      .leftJoin(papers, eq(userNotes.paperId, papers.id))
+      .where(eq(userNotes.userId, userId))
+      .orderBy(desc(userNotes.updatedAt))
+      .limit(6);
+    const recentNotes = noteRows.map((r) => ({
+      id: r.n.id,
+      excerpt: truncate(r.n.content, 140),
+      paperId: r.n.paperId,
+      paperTitle: r.pTitle ?? null,
+      paperUrl: r.pUrl ?? null,
+      updatedAt: r.n.updatedAt.toISOString(),
+    }));
+
+    // Legacy sync-run bookkeeping is retained for the admin source-management surface but is
+    // deliberately NOT surfaced on the ordinary dashboard.
+    const [failedRes] = await this.db
+      .select({ n: count() })
+      .from(sourceSyncRuns)
+      .where(sql`${sourceSyncRuns.status} = 'error'`);
 
     const runRows = await this.db
       .select({ r: sourceSyncRuns, jName: journals.name })
@@ -189,6 +269,10 @@ export class WorkspaceService {
     return {
       stats,
       newThisWeek: weekRes?.n ?? 0,
+      interestKeywordHits,
+      highRelevancePending: hrRes?.n ?? 0,
+      todoBacklog: stats.checklistTodoCount,
+      recentNotes,
       failedRuns: failedRes?.n ?? 0,
       recentPapers,
       recentRuns,
