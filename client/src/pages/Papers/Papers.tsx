@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Empty,
   EmptyContent,
@@ -51,6 +52,8 @@ const PAGE_SIZE = 10;
 
 const Papers: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canWrite = !!user?.isAdmin;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const journalId: string = searchParams.get('journalId') || '';
@@ -221,6 +224,7 @@ const Papers: React.FC = () => {
           <Search className="size-4" />
           搜索
         </Button>
+        {canWrite && (
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
             <Button className="rounded-[8px]">
@@ -414,6 +418,7 @@ const Papers: React.FC = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-3">

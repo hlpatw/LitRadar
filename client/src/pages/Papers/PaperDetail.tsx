@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
   DialogContent,
@@ -41,6 +42,8 @@ import {
 const PaperDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canWrite = !!user?.isAdmin;
 
   const [paper, setPaper] = React.useState<PaperDetailType | null>(null);
   const [favorites, setFavorites] = React.useState<FavoriteItem[]>([]);
@@ -395,6 +398,8 @@ const PaperDetailPage: React.FC = () => {
           {togglingTodo ? <Spinner className="size-4" /> : <CheckSquare className="size-4" />}
           {inChecklist ? '已在待读' : '加入待读'}
         </Button>
+        {canWrite && (
+        <>
         <Button
           onClick={openEditDialog}
           variant="outline"
@@ -428,6 +433,8 @@ const PaperDetailPage: React.FC = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        </>
+        )}
       </div>
 
       {/* Quick note on this paper */}

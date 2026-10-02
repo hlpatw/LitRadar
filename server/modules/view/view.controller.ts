@@ -1,17 +1,13 @@
-import { Controller, Get, Render, Req } from '@nestjs/common';
-import type { Request } from 'express';
+import { Controller, Get, Render } from '@nestjs/common';
 
 @Controller()
 export class ViewController {
-
+  // Serves the SPA shell. No server-injected locals: the built index.html is a static
+  // Vite bundle, and the client reads no platform global from the server (the legacy
+  // __platform__ render param had no consumer and was removed).
   @Get(['/', '*'])
   @Render('index')
-  async render(@Req() req: Request): Promise<{ __platform__: string }>  {
-    // you can add custom render params here
-    const platformData = req.__platform_data__ ?? {};
-    return {
-      // don't delete this line, it's used by client to get platform info
-      __platform__: JSON.stringify(platformData),
-    };
+  render(): Record<string, never> {
+    return {};
   }
 }

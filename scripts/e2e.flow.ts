@@ -41,6 +41,7 @@ async function main() {
   process.env.DATABASE_URL = conn;
   process.env.JWT_SECRET = 'e2e-secret-at-least-32-characters-long-xx';
   process.env.SERVER_PORT = String(appPort);
+  process.env.ADMIN_EMAILS = 'admin-e2e@example.com';
 
   const { NestFactory } = await import('@nestjs/core');
   const { AppModule } = (await import('../dist/server/app.module.js')) as any;
@@ -146,6 +147,50 @@ async function main() {
     const sync = await call('POST', '/api/connectors/sync-all', token);
     if (sync.status !== 403) throw new Error('non-admin sync-all expected 403, got ' + sync.status);
     console.log('[ok] non-admin manual sync -> 403 (admin-gated)');
+
+    // 14) PAPERS WRITE PERMISSION MATRIX (dual-user).
+    // Regular user (token): reads open, writes blocked. Admin user: writes allowed.
+    // 14a) regular user reads still work
+    const regList = await call('GET', '/api/papers', token);
+    if (regList.status !== 200) throw new Error('regular user GET /api/papers expected 200, got ' + regList.status);
+    console.log('[ok] regular user GET /api/papers -> 200 (read boundary preserved)');
+
+    // 14b) regular user writes -> 403
+    const regCreate = await call('POST', '/api/papers', token, { title: 'regular-user forbidden' });
+    if (regCreate.status !== 403) throw new Error('regular user POST /api/papers expected 403, got ' + regCreate.status);
+    const regPatch = await call('PATCH', '/api/papers/11111111-1111-4000-8000-000000000001', token, { title: 'x' });
+    if (regPatch.status !== 403) throw new Error('regular user PATCH /api/papers/:id expected 403, got ' + regPatch.status);
+    const regDel = await call('DELETE', '/api/papers/11111111-1111-4000-8000-000000000001', token);
+    if (regDel.status !== 403) throw new Error('regular user DELETE /api/papers/:id expected 403, got ' + regDel.status);
+    console.log('[ok] regular user POST/PATCH/DELETE /api/papers -> 403 (write gated)');
+
+    // 14c) admin user: register with the allowlisted admin email
+    const adminUname = 'admin_' + Date.now();
+    const adminReg = await call('POST', '/api/auth/register', undefined, {
+      username: adminUname, password: 'password123', email: 'admin-e2e@example.com',
+    });
+    if (adminReg.status !== 201 && adminReg.status !== 200) throw new Error('admin register -> ' + adminReg.status);
+    const adminToken = adminReg.data.token;
+    if (!adminReg.data.user?.isAdmin) throw new Error('admin-email register should report isAdmin=true');
+    console.log('[ok] admin user registered; isAdmin =', adminReg.data.user.isAdmin);
+
+    // 14d) admin create -> 201
+    const adminCreate = await call('POST', '/api/papers', adminToken, { title: 'admin-created paper', url: 'https://example.org/x' });
+    if (adminCreate.status !== 201) throw new Error('admin POST /api/papers expected 201, got ' + adminCreate.status + ' ' + JSON.stringify(adminCreate.data));
+    const adminPaperId = adminCreate.data.id;
+    console.log('[ok] admin POST /api/papers -> 201 (id=' + adminPaperId + ')');
+
+    // 14e) admin update -> 200
+    const adminPatch = await call('PATCH', `/api/papers/${adminPaperId}`, adminToken, { title: 'admin-created paper (edited)' });
+    if (adminPatch.status !== 200) throw new Error('admin PATCH expected 200, got ' + adminPatch.status);
+    console.log('[ok] admin PATCH /api/papers/:id -> 200');
+
+    // 14f) admin detail read -> 200, then delete -> 204
+    const adminDetail = await call('GET', `/api/papers/${adminPaperId}`);
+    if (adminDetail.status !== 200) throw new Error('paper detail expected 200, got ' + adminDetail.status);
+    const adminDel = await call('DELETE', `/api/papers/${adminPaperId}`, adminToken);
+    if (adminDel.status !== 204 && adminDel.status !== 200) throw new Error('admin DELETE expected 204, got ' + adminDel.status);
+    console.log('[ok] admin DELETE /api/papers/:id -> ' + adminDel.status);
 
     console.log('\n=== E2E FLOW REGRESSION PASSED ===');
   } finally {
