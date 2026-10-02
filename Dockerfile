@@ -9,6 +9,9 @@ RUN npm prune --omit=dev
 
 FROM node:22-alpine
 WORKDIR /app
+# Runtime runs in production mode so the fail-fast guards (DATABASE_URL, JWT_SECRET) fire.
+# APP_ENV (staging/prod) is orthogonal and drives the label shown in /api/version.
+ENV NODE_ENV=production
 COPY --from=builder /build/package.json ./
 COPY --from=builder /build/node_modules/ ./node_modules/
 # dist carries compiled server AND the SQL migrations copied by nest-cli assets.

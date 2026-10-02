@@ -23,6 +23,15 @@ async function bootstrap() {
     );
   }
 
+  // Refuse to boot in production with a missing/weak JWT secret. Checked before any
+  // DB I/O so config errors surface immediately, not after a connection attempt.
+  if (isProd) {
+    const secret = process.env.JWT_SECRET || '';
+    if (secret.length < 32 || /change-me|default|secret/i.test(secret)) {
+      throw new Error('JWT_SECRET must be set to a long, non-default random value in production');
+    }
+  }
+
   // B3: apply pending migrations before serving traffic. Tracks state in _migrations so a
   // fresh DB builds fully and an existing DB only applies deltas. Single source of truth
   // (no separate deploy/migration.sql fork at runtime).
@@ -53,14 +62,6 @@ async function bootstrap() {
       ? { origin: corsOrigin.split(',').map((s) => s.trim()), credentials: true }
       : true,
   );
-
-  // Refuse to boot in production with a missing/weak JWT secret.
-  if (process.env.NODE_ENV === 'production') {
-    const secret = process.env.JWT_SECRET || '';
-    if (secret.length < 32 || /change-me|default|secret/i.test(secret)) {
-      throw new Error('JWT_SECRET must be set to a long, non-default random value in production');
-    }
-  }
 
   const logger = new Logger('Bootstrap');
   const host = process.env.SERVER_HOST || '0.0.0.0';

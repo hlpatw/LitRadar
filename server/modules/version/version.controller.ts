@@ -37,7 +37,9 @@ export class VersionController {
     }
 
     return {
-      environment: process.env.NODE_ENV || 'development',
+      // APP_ENV labels the deploy target (staging/prod); NODE_ENV drives behavior.
+      // Prefer APP_ENV so staging (NODE_ENV=production) still reads as "staging".
+      environment: process.env.APP_ENV || process.env.NODE_ENV || 'development',
       commit:
         process.env.RAILWAY_GIT_COMMIT_SHA ||
         process.env.RENDER_GIT_COMMIT ||
