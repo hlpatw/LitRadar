@@ -29,13 +29,13 @@ import type {
   UpdateChecklistRequest,
   CreateNoteRequest,
   UpdateNoteRequest,
-  UpdateSettingsRequest,
   PaperItem,
   PaperDetail,
   Overview,
   OverviewRun,
   ReadingState,
 } from '@shared/api.interface';
+import { UpdateSettingsDto } from './dto/update-settings.dto';
 
 function mapPaper(p: typeof papers.$inferSelect): PaperItem {
   return {
@@ -424,8 +424,48 @@ export class WorkspaceService {
       .limit(1);
     if (!orphan) throw new NotFoundException('阅读清单记录不存在');
 
+    // An orphan (paper_id IS NULL) being linked to a real paper is a one-way migration: upsert
+    // the authority row with its reading state, then delete the free-text ghost row so it never
+    // shows up as a duplicate. This keeps the single (user,paper) authority consistent.
+    if (dto.paperId) {
+      const [paper] = await this.db
+        .select({ id: papers.id })
+        .from(papers)
+        .where(eq(papers.id, dto.paperId))
+        .limit(1);
+      if (!paper) throw new NotFoundException('论文不存在');
+
+      const state = fromLegacyStatus(dto.status ?? orphan.status);
+      const [row] = await this.db
+        .insert(userLibrary)
+        .values({
+          userId,
+          paperId: dto.paperId,
+          readingState: state,
+          createdBy: userId,
+          updatedBy: userId,
+        })
+        .onConflictDoUpdate({
+          target: [userLibrary.userId, userLibrary.paperId],
+          set: { readingState: state, updatedAt: new Date(), updatedBy: userId },
+        })
+        .returning();
+
+      await this.db.delete(readingChecklist).where(eq(readingChecklist.id, id));
+
+      return {
+        id: row.id,
+        paperId: row.paperId,
+        titleOverride: null,
+        status: toLegacyStatus(row.readingState),
+        sortOrder: 0,
+        paper: null,
+        createdAt: row.addedAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    }
+
     const patch: Record<string, unknown> = {};
-    if (dto.paperId !== undefined) patch.paperId = dto.paperId;
     if (dto.titleOverride !== undefined) patch.titleOverride = dto.titleOverride;
     if (dto.status !== undefined) patch.status = dto.status;
     if (dto.sortOrder !== undefined) patch.sortOrder = dto.sortOrder;
@@ -608,8 +648,21 @@ export class WorkspaceService {
 
   async updateSettings(
     userId: string,
-    dto: UpdateSettingsRequest,
+    dto: UpdateSettingsDto,
   ): Promise<UserSettings & { recWeights: Record<string, number> | null }> {
+    // recWeights: DTO whitelists the five numeric fields bounded to 0..1 (unknown fields are
+    // stripped by the global ValidationPipe). Enforce a positive total so recommendations
+    // never collapse to an all-zero score.
+    let recWeights: Record<string, number> | null | undefined = dto.recWeights
+      ? { ...dto.recWeights }
+      : undefined;
+    if (recWeights) {
+      const sum = Object.values(recWeights).reduce((a, b) => a + b, 0);
+      if (!(sum > 0)) {
+        throw new BadRequestException('recWeights 权重之和必须大于 0');
+      }
+    }
+
     const [existing] = await this.db
       .select({ id: userSettings.id })
       .from(userSettings)
@@ -620,7 +673,7 @@ export class WorkspaceService {
       if (dto.fieldOfStudy !== undefined) patch.fieldOfStudy = dto.fieldOfStudy;
       if (dto.interestedKeywords !== undefined)
         patch.interestedKeywords = dto.interestedKeywords;
-      if (dto.recWeights !== undefined) patch.recWeights = dto.recWeights;
+      if (recWeights !== undefined) patch.recWeights = recWeights;
       patch.updatedAt = new Date();
       patch.updatedBy = userId;
 
@@ -644,7 +697,7 @@ export class WorkspaceService {
         userId,
         fieldOfStudy: dto.fieldOfStudy ?? null,
         interestedKeywords: dto.interestedKeywords ?? null,
-        recWeights: dto.recWeights ?? null,
+        recWeights: recWeights ?? null,
       })
       .returning();
 

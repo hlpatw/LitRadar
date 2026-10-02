@@ -21,7 +21,18 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const migDir = join(root, 'server', 'database', 'migrations');
 const f = (p: string) => readFileSync(p, 'utf8');
-const UP = ['0000_base.up.sql', '0005_user_library.up.sql'];
+// Full accepted migration chain — not just 0000+0005 — so the library backfill is exercised
+// against the same schema shape the release boots. Split: 0000-0004 first, then 0005 (the
+// library backfill) is applied AFTER legacy data is inserted so it actually backfills.
+const PRE_UP = [
+  '0000_base.up.sql',
+  '0001_sources.up.sql',
+  '0002_reconcile.up.sql',
+  '0003_full_catalog.up.sql',
+  '0004_correct_issn.up.sql',
+];
+const LIBRARY_UP = '0005_user_library.up.sql';
+const LIBRARY_DOWN = '0005_user_library.down.sql';
 const dataDir = mkdtempSync(join(tmpdir(), 'litradar-library-'));
 
 async function main() {
@@ -34,20 +45,20 @@ async function main() {
   const q = async (s: string, p?: any[]) => (await client.query(s, p)).rows;
 
   try {
-    // ── minimal journals + papers ──
-    await client.query(f(join(migDir, '0000_base.up.sql')));
-    await client.query(
-      `INSERT INTO journals (id,name,priority) VALUES
-        ('11111111-0000-4000-8000-000000000001','Cognition','P0'),
-        ('11111111-0000-4000-8000-000000000002','Memory & Cognition','P2')`
-    );
+    // ── apply accepted chain up through 0004 (NOT yet the library migration) ──
+    for (const up of PRE_UP) await client.query(f(join(migDir, up)));
+
+    // Catalog from 0003 already contains these; reuse their real IDs (no manual journals).
+    const cog = (await q(`SELECT id FROM journals WHERE name='Cognition'`))[0].id;
+    const mc = (await q(`SELECT id FROM journals WHERE name='Memory & Cognition'`))[0].id;
+
     await client.query(
       `INSERT INTO papers (id,journal_id,title,keywords,abstract_text,published_date) VALUES
-        ('aaaaaaaa-0000-4000-8000-000000000001','11111111-0000-4000-8000-000000000001','Priming effects in sentence comprehension','priming, syntax, prediction','We studied...', CURRENT_DATE - 10),
-        ('aaaaaaaa-0000-4000-8000-000000000002','11111111-0000-4000-8000-000000000002','Statistical learning review','statistics, segmentation', NULL, CURRENT_DATE - 400),
-        ('aaaaaaaa-0000-4000-8000-000000000003','11111111-0000-4000-8000-000000000001','Semantic attraction','agreement, plausibility','We show...', CURRENT_DATE - 30),
-        ('aaaaaaaa-0000-4000-8000-000000000004','11111111-0000-4000-8000-000000000002','Phonological neighborhood','phonology', 'Abstract here.', CURRENT_DATE - 800)`
-    );
+        ('aaaaaaaa-0000-4000-8000-000000000001',$1,'Priming effects in sentence comprehension','priming, syntax, prediction','We studied...', CURRENT_DATE - 10),
+        ('aaaaaaaa-0000-4000-8000-000000000002',$2,'Statistical learning review','statistics, segmentation', NULL, CURRENT_DATE - 400),
+        ('aaaaaaaa-0000-4000-8000-000000000003',$1,'Semantic attraction','agreement, plausibility','We show...', CURRENT_DATE - 30),
+        ('aaaaaaaa-0000-4000-8000-000000000004',$2,'Phonological neighborhood','phonology', 'Abstract here.', NULL)`
+      , [cog, mc]);
     const P1 = 'aaaaaaaa-0000-4000-8000-000000000001';
     const P2 = 'aaaaaaaa-0000-4000-8000-000000000002';
     const P3 = 'aaaaaaaa-0000-4000-8000-000000000003';
@@ -66,8 +77,8 @@ async function main() {
     await client.query(`INSERT INTO user_favorites (user_id,paper_id) VALUES ('user-b',$1)`, [P2]);
 
     // ── run migration 0005 (twice -> idempotent) ──
-    await client.query(f(join(migDir, '0005_user_library.up.sql')));
-    await client.query(f(join(migDir, '0005_user_library.up.sql')));
+    await client.query(f(join(migDir, LIBRARY_UP)));
+    await client.query(f(join(migDir, LIBRARY_UP)));
 
     // paper-linked library rows for user-a: p-1 (fav + reading), p-3 (read, deduped)
     const aRows = await q(`SELECT paper_id, is_favorite, reading_state FROM user_library WHERE user_id='user-a' ORDER BY paper_id`);
@@ -130,7 +141,7 @@ async function main() {
     console.log('[ok] cold-start detection: established user false, fresh user true');
 
     // ── down: drop only new objects; legacy data intact ──
-    await client.query(f(join(migDir, '0005_user_library.down.sql')));
+    await client.query(f(join(migDir, LIBRARY_DOWN)));
     const libGone = (await q(`SELECT to_regclass('public.user_library') AS v`))[0].v === null;
     const fbGone = (await q(`SELECT to_regclass('public.user_recommendation_feedback') AS v`))[0].v === null;
     if (!libGone || !fbGone) throw new Error('[down] new tables should be dropped');
@@ -140,7 +151,7 @@ async function main() {
     console.log('[ok] down drops only new tables; legacy favorites/notes preserved');
 
     // re-up idempotent
-    await client.query(f(join(migDir, '0005_user_library.up.sql')));
+    await client.query(f(join(migDir, LIBRARY_UP)));
     const aRe = await q(`SELECT count(*)::int c FROM user_library WHERE user_id='user-a'`);
     if (aRe[0].c !== 2) throw new Error(`[re-up] expected 2 rows, got ${aRe[0].c}`);
     console.log('[ok] re-up rebuilds cleanly');

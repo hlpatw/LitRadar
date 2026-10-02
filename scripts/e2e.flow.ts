@@ -190,6 +190,42 @@ async function main() {
     if (libAfterRm.data.items.some((i: any) => i.paperId === paperForLib.id)) throw new Error('library paper still present after remove');
     console.log('[ok] library remove association (notes untouched)');
 
+    // feedback on a nonexistent paper -> 404 (not an FK-violation 500)
+    const badFb = await call('POST', '/api/library/00000000-0000-4000-8000-000000000000/feedback', token, { feedbackType: 'uninterested' });
+    if (badFb.status !== 404) throw new Error('feedback on missing paper should 404, got ' + badFb.status);
+    console.log('[ok] feedback on unknown paper -> 404 (no FK 500)');
+
+    // recommendations expose structured matchedKeywords array + breakdown
+    const reco3 = await call('GET', '/api/library/recommendations?limit=5', token);
+    if (reco3.status !== 200) throw new Error('rec list -> ' + reco3.status);
+    for (const it of reco3.data.items ?? []) {
+      if (!Array.isArray(it.matchedKeywords)) throw new Error('recommendation item missing matchedKeywords array');
+      if (!it.breakdown || typeof it.breakdown.interest !== 'number') throw new Error('recommendation item missing breakdown');
+    }
+    console.log('[ok] recommendations expose matchedKeywords[] + breakdown per item');
+
+    // quick unfavorite: favorite a paper then unfavorite with no state/tags -> row deleted
+    const favToggle = await call('POST', `/api/library/${otherPaper.id}/favorite`, token, { isFavorite: true });
+    if (favToggle.status !== 200) throw new Error('quick favorite on -> ' + favToggle.status);
+    const afterFav = await call('GET', '/api/library', token);
+    if (!afterFav.data.items.some((i: any) => i.paperId === otherPaper.id)) throw new Error('quick favorite did not create association');
+    const unfavToggle = await call('POST', `/api/library/${otherPaper.id}/favorite`, token, { isFavorite: false });
+    if (unfavToggle.status !== 200) throw new Error('quick favorite off -> ' + unfavToggle.status);
+    const afterUnfav = await call('GET', '/api/library', token);
+    if (afterUnfav.data.items.some((i: any) => i.paperId === otherPaper.id)) throw new Error('unfavorite left an empty library row; should be deleted');
+    console.log('[ok] quick unfavorite deletes empty association (paper re-enters recommendations)');
+
+    // same paper with reading state: unfavorite KEEPS the row (state preserved)
+    const withState = await call('PUT', `/api/library/${otherPaper.id}`, token, { isFavorite: true, readingState: 'todo' });
+    if (withState.status !== 200) throw new Error('upsert with state -> ' + withState.status);
+    const unfavKeep = await call('POST', `/api/library/${otherPaper.id}/favorite`, token, { isFavorite: false });
+    if (unfavKeep.status !== 200) throw new Error('unfav with state -> ' + unfavKeep.status);
+    const afterKeep = await call('GET', '/api/library', token);
+    const keepRow = afterKeep.data.items.find((i: any) => i.paperId === otherPaper.id);
+    if (!keepRow || keepRow.readingState !== 'todo' || keepRow.isFavorite) throw new Error('unfavorite should keep state row: ' + JSON.stringify(keepRow));
+    console.log('[ok] unfavorite with reading state clears favorite but keeps association');
+    await call('DELETE', `/api/library/${otherPaper.id}`, token);
+
     // 9) version (public)
     const ver = await call('GET', '/api/version');
     if (ver.status !== 200 || !ver.data.commit || !ver.data.environment) throw new Error('version -> ' + ver.status);

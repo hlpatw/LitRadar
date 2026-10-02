@@ -24,10 +24,10 @@ import type {
   UpdateChecklistRequest,
   CreateNoteRequest,
   UpdateNoteRequest,
-  UpdateSettingsRequest,
   CreateFavoriteRequest,
   Overview,
 } from '@shared/api.interface';
+import { UpdateSettingsDto } from './dto/update-settings.dto';
 
 @Controller('api/workspace')
 export class WorkspaceController {
@@ -171,7 +171,7 @@ export class WorkspaceController {
   @Put('settings')
   async updateSettings(
     @Req() req: Request,
-    @Body() body: UpdateSettingsRequest,
+    @Body() body: UpdateSettingsDto,
   ): Promise<UserSettings> {
     const userId = getAuthenticatedUserId(req);
     return this.workspaceService.updateSettings(userId, body);

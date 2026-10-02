@@ -152,23 +152,58 @@ export class LibraryService {
       })
       .returning();
 
+    // Unified unfavorite rule: if the favorite was just cleared and the row now carries no
+    // reading state and no personal tags, it is an empty association -> delete it so the paper
+    // can re-enter recommendations. If it still has status/tags, only the flag is cleared.
+    if (dto.isFavorite === false) {
+      const [current] = await this.db
+        .select()
+        .from(userLibrary)
+        .where(and(eq(userLibrary.userId, userId), eq(userLibrary.paperId, paperId)))
+        .limit(1);
+      const empty =
+        current &&
+        current.isFavorite === false &&
+        current.readingState === null &&
+        (current.personalTags === null || current.personalTags.trim() === '');
+      if (empty) {
+        await this.db
+          .delete(userLibrary)
+          .where(and(eq(userLibrary.userId, userId), eq(userLibrary.paperId, paperId)));
+      }
+    }
+
     const [joined] = await this.db
-      .select({ p: papers, jName: journals.name, noteCount: sql<number>`(SELECT count(*)::int FROM user_notes n WHERE n.paper_id = ${userLibrary.paperId} AND n.user_id = ${userLibrary.userId})` })
+      .select({ lib: userLibrary, p: papers, jName: journals.name, noteCount: sql<number>`(SELECT count(*)::int FROM user_notes n WHERE n.paper_id = ${userLibrary.paperId} AND n.user_id = ${userLibrary.userId})` })
       .from(userLibrary)
       .leftJoin(papers, eq(userLibrary.paperId, papers.id))
       .leftJoin(journals, eq(papers.journalId, journals.id))
       .where(and(eq(userLibrary.userId, userId), eq(userLibrary.paperId, paperId)))
       .limit(1);
 
+    if (!joined) {
+      // Row was cleaned up as an empty association (unfavorited with no state/tags).
+      return {
+        id: null as unknown as string,
+        paperId,
+        isFavorite: false,
+        readingState: null,
+        personalTags: null,
+        addedAt: '',
+        paper: null,
+        noteCount: 0,
+      };
+    }
+
     return {
-      id: row.id,
-      paperId: row.paperId,
-      isFavorite: row.isFavorite,
-      readingState: (row.readingState as ReadingState | null) ?? null,
-      personalTags: row.personalTags,
-      addedAt: row.addedAt.toISOString(),
-      paper: joined?.p ? mapPaperDetail(joined.p, joined.jName, joined.p.fetchedAt) : null,
-      noteCount: joined?.noteCount ?? 0,
+      id: joined.lib.id,
+      paperId: joined.lib.paperId,
+      isFavorite: joined.lib.isFavorite,
+      readingState: (joined.lib.readingState as ReadingState | null) ?? null,
+      personalTags: joined.lib.personalTags,
+      addedAt: joined.lib.addedAt.toISOString(),
+      paper: joined.p ? mapPaperDetail(joined.p, joined.jName, joined.p.fetchedAt) : null,
+      noteCount: joined.noteCount,
     };
   }
 
@@ -190,6 +225,12 @@ export class LibraryService {
   // ── Feedback (uninterested) — separate table, never a library row ───────────
 
   async setFeedback(userId: string, paperId: string, feedbackType: 'uninterested', note?: string): Promise<void> {
+    const [paper] = await this.db
+      .select({ id: papers.id })
+      .from(papers)
+      .where(eq(papers.id, paperId))
+      .limit(1);
+    if (!paper) throw new NotFoundException('论文不存在');
     await this.db
       .insert(userRecommendationFeedback)
       .values({ userId, paperId, feedbackType, note: note ?? null, createdBy: userId, updatedBy: userId })
@@ -213,7 +254,10 @@ export class LibraryService {
 
   // ── In-database explainable recommendations ────────────────────────────────
 
-  private resolveWeights(override?: Partial<RecWeights> | null, stored?: Record<string, number> | null): RecWeights {
+  private resolveWeights(
+    override?: Partial<RecWeights> | null,
+    stored?: Record<string, number> | null,
+  ): RecWeights {
     return { ...DEFAULT_REC_WEIGHTS, ...(stored ?? {}), ...(override ?? {}) };
   }
 
@@ -229,10 +273,17 @@ export class LibraryService {
       .from(userSettings)
       .where(eq(userSettings.userId, userId))
       .limit(1);
-    const weights = this.resolveWeights(weightOverride, (settingsRow?.recWeights as Record<string, number> | null) ?? null);
+    const weights = this.resolveWeights(
+      weightOverride,
+      (settingsRow?.recWeights as Record<string, number> | null) ?? null,
+    );
 
-    // Pure-SQL candidate selection + explainable components. No LLM, no external calls.
-    // Exclusions: ANY user_library row (favorite/todo/reading/read alike) AND uninterested feedback.
+    // Pure-SQL candidate selection + explainable components. No LLM / external / scheduler.
+    // * Lexical profile = word tokens from title+abstract+keywords of ALL library papers AND
+    //   all paper-linked notes for this user.
+    // * Candidate scoring matches tokens against the candidate's title+abstract+keywords text.
+    // * Exclusions: ANY user_library row (favorite/todo/reading/read alike) AND uninterested feedback.
+    // * Unknown dates -> freshness 0. Tie-break deterministic: score, recency, title, id.
     const result = await this.db.execute(sql`
       WITH settings AS (
         SELECT interested_keywords FROM user_settings WHERE user_id = ${userId}
@@ -242,14 +293,18 @@ export class LibraryService {
         FROM settings, unnest(string_to_array(settings.interested_keywords, ',')) AS t
         WHERE settings.interested_keywords IS NOT NULL AND trim(t) <> ''
       ),
-      corpus_tokens AS (
-        SELECT DISTINCT lower(trim(t)) AS tok FROM (
-          SELECT p.keywords AS kw FROM user_library ul JOIN papers p ON p.id = ul.paper_id WHERE ul.user_id = ${userId}
-          UNION
-          SELECT p.keywords AS kw FROM user_notes n JOIN papers p ON p.id = n.paper_id
-            WHERE n.user_id = ${userId} AND n.paper_id IS NOT NULL
-        ) src, unnest(string_to_array(src.kw, ',')) AS t
-        WHERE src.kw IS NOT NULL AND trim(t) <> ''
+      profile_text AS (
+        SELECT lower(coalesce(p.title,'') || ' ' || coalesce(p.abstract_text,'') || ' ' || coalesce(p.keywords,'')) AS txt
+        FROM user_library ul JOIN papers p ON p.id = ul.paper_id WHERE ul.user_id = ${userId}
+        UNION ALL
+        SELECT lower(coalesce(p.title,'') || ' ' || coalesce(p.abstract_text,'') || ' ' || coalesce(p.keywords,'')) AS txt
+        FROM user_notes n JOIN papers p ON p.id = n.paper_id
+        WHERE n.user_id = ${userId} AND n.paper_id IS NOT NULL
+      ),
+      profile_tokens AS (
+        SELECT DISTINCT lower(trim(t)) AS tok
+        FROM profile_text, unnest(regexp_split_to_array(profile_text.txt, '[^a-zA-Z0-9]+')) AS t
+        WHERE length(trim(t)) >= 3
       ),
       excluded_lib AS (
         SELECT paper_id FROM user_library WHERE user_id = ${userId}
@@ -261,59 +316,82 @@ export class LibraryService {
       cand AS (
         SELECT
           p.id, p.journal_id, p.title, p.authors, p.doi, p.keywords, p.abstract_text,
-          p.methods, p.conclusions, p.published_date, p.url, p.fetched_at, p._created_at,
-          j.name AS journal_name, j.priority AS source_priority
+          p.methods, p.conclusions, p.published_date, p.fetched_at, p._created_at,
+          j.name AS journal_name, j.priority AS source_priority,
+          lower(coalesce(p.title,'') || ' ' || coalesce(p.abstract_text,'') || ' ' || coalesce(p.keywords,'')) AS ctext
         FROM papers p
         LEFT JOIN journals j ON j.id = p.journal_id
         WHERE p.id NOT IN (SELECT paper_id FROM excluded_lib)
           AND p.id NOT IN (SELECT paper_id FROM excluded_neg)
       ),
+      matched AS (
+        SELECT
+          cand.id,
+          (SELECT coalesce(array_agg(DISTINCT it.tok), '{}') FROM interest_tokens it WHERE cand.ctext LIKE '%' || it.tok || '%') AS interest_arr,
+          (SELECT coalesce(array_agg(DISTINCT pt.tok), '{}') FROM profile_tokens pt WHERE cand.ctext LIKE '%' || pt.tok || '%') AS profile_arr
+        FROM cand
+      ),
       scored AS (
         SELECT
           cand.*,
-          (SELECT count(*) FROM interest_tokens it WHERE cand.keywords ILIKE '%' || it.tok || '%') AS interest_hits,
-          (SELECT count(*) FROM corpus_tokens ct WHERE cand.keywords ILIKE '%' || ct.tok || '%') AS corpus_hits,
-          (SELECT count(*) FROM unnest(string_to_array(cand.keywords, ',')) AS t WHERE trim(t) <> '') AS kw_count
-        FROM cand
+          matched.interest_arr,
+          matched.profile_arr,
+          LEAST(1.0, coalesce(array_length(matched.interest_arr,1),0)::numeric / 3.0) AS interest_score,
+          LEAST(1.0, coalesce(array_length(matched.profile_arr,1),0)::numeric / 5.0) AS lexical_score,
+          CASE cand.source_priority
+            WHEN 'P0' THEN 1.0 WHEN 'P1' THEN 0.75 WHEN 'P2' THEN 0.5 WHEN 'P3' THEN 0.25 ELSE 0.4 END AS source_score,
+          CASE
+            WHEN cand.published_date IS NOT NULL
+              THEN GREATEST(0, 1 - ((CURRENT_DATE - cand.published_date)::numeric / 730.0))
+            WHEN cand.fetched_at IS NOT NULL
+              THEN GREATEST(0, 1 - ((CURRENT_DATE - cand.fetched_at::date)::numeric / 730.0))
+            ELSE 0
+          END AS freshness_score,
+          CASE WHEN cand.abstract_text IS NOT NULL AND cand.abstract_text <> '' THEN 1.0 ELSE 0.0 END AS abstract_score,
+          COALESCE(cand.published_date, cand.fetched_at::date) AS recency
+        FROM cand JOIN matched ON matched.id = cand.id
       )
       SELECT
         scored.*,
-        (scored.kw_count::numeric) AS kw_count_n,
-        (CASE WHEN scored.kw_count > 0 THEN LEAST(1.0, scored.interest_hits::numeric / scored.kw_count) ELSE 0 END) AS interest_score,
-        (CASE WHEN scored.kw_count > 0 THEN LEAST(1.0, scored.corpus_hits::numeric / scored.kw_count) ELSE 0 END) AS lexical_score,
-        (CASE scored.source_priority
-          WHEN 'P0' THEN 1.0 WHEN 'P1' THEN 0.75 WHEN 'P2' THEN 0.5 WHEN 'P3' THEN 0.25 ELSE 0.4 END) AS source_score,
-        (GREATEST(0, 1 - ((CURRENT_DATE - COALESCE(scored.published_date, scored.fetched_at::date, CURRENT_DATE))::numeric / 730.0))) AS freshness_score,
-        (CASE WHEN scored.abstract_text IS NOT NULL AND scored.abstract_text <> '' THEN 1.0 ELSE 0.0 END) AS abstract_score
+        (${weights.interest}::numeric * scored.interest_score
+         + ${weights.lexical}::numeric * scored.lexical_score
+         + ${weights.source}::numeric * scored.source_score
+         + ${weights.freshness}::numeric * scored.freshness_score
+         + ${weights.abstract}::numeric * scored.abstract_score) AS total_score
       FROM scored
+      ORDER BY total_score DESC, recency DESC NULLS LAST, scored.title ASC, scored.id ASC
     `);
 
     const rows = ((result as any).rows ?? result ?? []) as any[];
 
-    const coldStart =
-      !(await this.db.select({ n: sql<number>`count(*)::int` }).from(userLibrary).where(eq(userLibrary.userId, userId)))[0]?.n &&
-      !(await this.db.select({ n: sql<number>`count(*)::int` }).from(userNotes).where(and(eq(userNotes.userId, userId), sql`${userNotes.paperId} IS NOT NULL`)))[0]?.n;
+    const [libCount] = await this.db
+      .select({ n: sql<number>`count(*)::int` }).from(userLibrary).where(eq(userLibrary.userId, userId));
+    const [noteCount] = await this.db
+      .select({ n: sql<number>`count(*)::int` }).from(userNotes)
+      .where(and(eq(userNotes.userId, userId), sql`${userNotes.paperId} IS NOT NULL`));
+    const coldStart = (libCount?.n ?? 0) === 0 && (noteCount?.n ?? 0) === 0;
 
-    const scored = rows.map((r) => {
+    const scoredItems: RecommendationItem[] = rows.map((r) => {
       const interest = Number(r.interest_score);
       const lexical = Number(r.lexical_score);
       const source = Number(r.source_score);
       const freshness = Number(r.freshness_score);
       const abstract = Number(r.abstract_score);
-      const total =
-        weights.interest * interest +
-        weights.lexical * lexical +
-        weights.source * source +
-        weights.freshness * freshness +
-        weights.abstract * abstract;
+      const total = Number(r.total_score);
+
+      const interestArr: string[] = r.interest_arr ?? [];
+      const profileArr: string[] = r.profile_arr ?? [];
+      const matchedKeywords: string[] = Array.from(new Set([...interestArr, ...profileArr])).slice(0, 12);
 
       const reasons: string[] = [];
-      if (interest > 0) reasons.push(`匹配你的兴趣关键词`);
-      if (lexical > 0) reasons.push(`与你已收藏/已读论文关键词重合`);
-      if (source >= 0.75) reasons.push(`来自高优先级来源(${r.source_priority ?? '未知'})`);
+      if (interestArr.length > 0) reasons.push(`匹配兴趣关键词: ${interestArr.slice(0,4).join(', ')}`);
+      if (profileArr.length > 0) reasons.push(`与你已收藏/已读/笔记论文词汇重合: ${profileArr.slice(0,4).join(', ')}`);
+      if (source >= 0.75) reasons.push(`高优先级来源(${r.source_priority ?? '未知'}: ${r.journal_name ?? '未知'})`);
+      else if (source >= 0.5) reasons.push(`中优先级来源(${r.source_priority ?? '未知'})`);
       if (freshness > 0.7) reasons.push(`近期发表`);
+      else if (freshness > 0) reasons.push(`发表于 ${r.published_date ? String(r.published_date).slice(0,10) : '近期抓取'}`);
       if (abstract >= 1) reasons.push(`含摘要`);
-      if (coldStart) reasons.push(`冷启动：基于兴趣关键词与来源优先级推荐`);
+      if (coldStart) reasons.push(`冷启动：尚无个人阅读历史，按来源优先级/新鲜度/含摘要排序`);
 
       const paper: PaperDetail = mapPaperDetail(
         { ...r, _created_at: r._created_at },
@@ -324,15 +402,18 @@ export class LibraryService {
         paper,
         score: Number(total.toFixed(4)),
         breakdown: { interest, lexical, source, freshness, abstract },
+        matchedKeywords,
         reasons,
-      } as RecommendationItem;
+      };
     });
 
-    scored.sort((a, b) => b.score - a.score);
-    const items = scored.slice(0, safeLimit);
+    const items = scoredItems.slice(0, safeLimit);
 
-    const [excludedLibCount] = await this.db.select({ n: sql<number>`count(*)::int` }).from(userLibrary).where(eq(userLibrary.userId, userId));
-    const [excludedNegCount] = await this.db.select({ n: sql<number>`count(*)::int` }).from(userRecommendationFeedback).where(and(eq(userRecommendationFeedback.userId, userId), eq(userRecommendationFeedback.feedbackType, 'uninterested')));
+    const [excludedLibCount] = await this.db
+      .select({ n: sql<number>`count(*)::int` }).from(userLibrary).where(eq(userLibrary.userId, userId));
+    const [excludedNegCount] = await this.db
+      .select({ n: sql<number>`count(*)::int` }).from(userRecommendationFeedback)
+      .where(and(eq(userRecommendationFeedback.userId, userId), eq(userRecommendationFeedback.feedbackType, 'uninterested')));
 
     return {
       items,

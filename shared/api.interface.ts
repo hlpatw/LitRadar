@@ -215,6 +215,7 @@ export interface RecommendationItem {
     freshness: number;
     abstract: number;
   };
+  matchedKeywords: string[];
   reasons: string[];
 }
 
