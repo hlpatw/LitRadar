@@ -13,6 +13,9 @@ import { readFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { freePort, hardTimeout } from './lib/test-env.ts';
+
+hardTimeout(180_000, 'migration.fixtures');
 
 process.on('uncaughtException', (e: any) => {
   if (e?.code === 'ECONNRESET' || /read ECONNRESET/.test(e?.message || '')) return;
@@ -23,8 +26,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const migDir = join(root, 'server', 'database', 'migrations');
 const f = (p: string) => readFileSync(p, 'utf8');
-const UP = ['0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql'];
-const DOWN = ['0004_correct_issn.down.sql', '0003_full_catalog.down.sql', '0002_reconcile.down.sql', '0001_sources.down.sql'];
+const UP = ['0000_base.up.sql', '0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql'];
+const DOWN = ['0004_correct_issn.down.sql', '0003_full_catalog.down.sql', '0002_reconcile.down.sql', '0001_sources.down.sql', '0000_base.down.sql'];
 
 const dataDir = mkdtempSync(join(tmpdir(), 'litradar-migfix-'));
 
@@ -76,9 +79,14 @@ const LEGACY_38: Array<[number, string, string | null, string]> = [
   [38, 'SRCD Biennial Meeting', null, 'P3'],
 ];
 
-async function resetDb(client: Client) {
+async function resetDb(client: Client, applyLegacyBaseline = true) {
   await client.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
-  await client.query(f(join(root, 'deploy', 'migration.sql')));
+  // applyLegacyBaseline=true simulates an existing legacy DB (hand-provisioned
+  // deploy/migration.sql). Scenario A passes false: a truly empty DB that must be
+  // built entirely by runUp (0000_base creates the tables).
+  if (applyLegacyBaseline) {
+    await client.query(f(join(root, 'deploy', 'migration.sql')));
+  }
 }
 
 async function upMigrations(client: Client) {
@@ -86,7 +94,7 @@ async function upMigrations(client: Client) {
 }
 
 async function scenarioEmpty(client: Client) {
-  await resetDb(client);
+  await resetDb(client, false); // TRULY empty: no hand-applied baseline.
   await upMigrations(client);
   const q = async (s: string) => (await client.query(s)).rows;
   const ready = Number((await q(`SELECT COUNT(*) c FROM journals WHERE connector_status='ready'`))[0].c);
@@ -202,10 +210,11 @@ async function scenarioProduction64(client: Client) {
 }
 
 async function main() {
-  const pg = new EmbeddedPostgres({ databaseDir: dataDir, user: 'postgres', password: 'postgres', port: 54401 });
+  const pgPort = await freePort();
+  const pg = new EmbeddedPostgres({ databaseDir: dataDir, user: 'postgres', password: 'postgres', port: pgPort });
   await pg.initialise();
   await pg.start();
-  const client = new Client({ connectionString: 'postgres://postgres:postgres@localhost:54401/postgres' });
+  const client = new Client({ connectionString: `postgres://postgres:postgres@localhost:${pgPort}/postgres` });
   await client.connect();
   try {
     await scenarioEmpty(client);

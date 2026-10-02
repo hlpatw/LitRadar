@@ -9,6 +9,9 @@ import { readFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { freePort, hardTimeout } from './lib/test-env.ts';
+
+hardTimeout(120_000, 'http.routes');
 
 // embedded-postgres occasionally resets an idle pool client at shutdown; ignore that
 // noise so the real assertions are what fail/succeed.
@@ -24,17 +27,18 @@ const f = (p: string) => readFileSync(p, 'utf8');
 const dataDir = mkdtempSync(join(tmpdir(), 'litradar-http-'));
 
 async function main() {
-  const pg = new EmbeddedPostgres({ databaseDir: dataDir, user: 'postgres', password: 'postgres', port: 54398 });
+  const pgPort = await freePort();
+  const appPort = await freePort();
+  const pg = new EmbeddedPostgres({ databaseDir: dataDir, user: 'postgres', password: 'postgres', port: pgPort });
   await pg.initialise();
   await pg.start();
-  const conn = 'postgres://postgres:postgres@localhost:54398/postgres';
+  const conn = `postgres://postgres:postgres@localhost:${pgPort}/postgres`;
 
-  // apply baseline + migrations
+  // Fresh boot: build the schema solely through the tracked migrator chain (0000-0004).
   const { Client } = await import('pg');
   const boot = new Client({ connectionString: conn });
   await boot.connect();
-  await boot.query(f(join(root, 'deploy', 'migration.sql')));
-  for (const m of ['0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql']) {
+  for (const m of ['0000_base.up.sql', '0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql']) {
     await boot.query(f(join(migDir, m)));
   }
   await boot.end();
@@ -42,17 +46,17 @@ async function main() {
   // start the compiled Nest app
   process.env.DATABASE_URL = conn;
   process.env.JWT_SECRET = 'test-secret-at-least-32-characters-long';
-  process.env.SERVER_PORT = '4599';
+  process.env.SERVER_PORT = String(appPort);
   const { NestFactory } = await import('@nestjs/core');
   const appMod = (await import('../dist/server/app.module.js')) as any;
   const { AppModule } = appMod;
   const app = await NestFactory.create(AppModule, { logger: false });
   await app.init();
   const server = app.getHttpServer();
-  await new Promise((r) => server.listen(4599, r));
+  await new Promise((r) => server.listen(appPort, r));
 
   const get = async (path: string) => {
-    const res = await fetch(`http://127.0.0.1:4599${path}`);
+    const res = await fetch(`http://127.0.0.1:${appPort}${path}`);
     let body: any = null;
     try { body = await res.json(); } catch { body = await res.text(); }
     return { status: res.status, body };
@@ -106,4 +110,4 @@ async function main() {
   }
 }
 
-main().catch((e) => { console.error('HTTP SMOKE FAILED:', e.message); process.exit(1); });
+main().then(() => process.exit(0)).catch((e) => { console.error('HTTP SMOKE FAILED:', e.message); process.exit(1); });

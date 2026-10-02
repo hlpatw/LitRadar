@@ -1,45 +1,48 @@
-// Isolated local end-to-end: embedded Postgres (port 54403) + compiled Nest app on 4598.
+// Isolated local end-to-end: embedded Postgres + compiled Nest app on OS-assigned ports.
 // Registers an ADMIN user (email in ADMIN_EMAILS), runs the real Crossref sync for all 7
 // ready sources TWICE to prove idempotency, records per-source results + paper counts,
-// then LEAVES THE SERVER RUNNING for a manual real-browser E2E. Touches no production DB.
+// then exits (set SERVE=1 to leave the server running for a manual real-browser E2E).
+// Touches no production DB.
 import EmbeddedPostgres from 'embedded-postgres';
 import { readFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { freePort, hardTimeout } from './lib/test-env.ts';
 
 process.on('uncaughtException', (e: any) => {
   if (e?.code === 'ECONNRESET' || /read ECONNRESET/.test(e?.message || '')) return;
   console.error('UNCAUGHT:', e);
 });
 
+hardTimeout(300_000, 'local.sync.e2e');
+
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const migDir = join(root, 'server', 'database', 'migrations');
 const f = (p: string) => readFileSync(p, 'utf8');
 const dataDir = mkdtempSync(join(tmpdir(), 'litradar-localsync-'));
-const PORT = 4598;
-const PG_PORT = 54403;
 const ADMIN_EMAIL = 'admin@litradar.local';
 
 async function main() {
-  const pg = new EmbeddedPostgres({ databaseDir: dataDir, user: 'postgres', password: 'postgres', port: PG_PORT });
+  const pgPort = await freePort();
+  const appPort = await freePort();
+  const pg = new EmbeddedPostgres({ databaseDir: dataDir, user: 'postgres', password: 'postgres', port: pgPort });
   await pg.initialise();
   await pg.start();
-  const conn = `postgres://postgres:postgres@localhost:${PG_PORT}/postgres`;
+  const conn = `postgres://postgres:postgres@localhost:${pgPort}/postgres`;
 
   const { Client } = await import('pg');
   const boot = new Client({ connectionString: conn });
   await boot.connect();
-  await boot.query(f(join(root, 'deploy', 'migration.sql')));
-  for (const m of ['0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql']) {
+  for (const m of ['0000_base.up.sql', '0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql']) {
     await boot.query(f(join(migDir, m)));
   }
   await boot.end();
 
   process.env.DATABASE_URL = conn;
   process.env.JWT_SECRET = 'local-sync-e2e-secret-at-least-32-chars-long-xxxx';
-  process.env.SERVER_PORT = String(PORT);
+  process.env.SERVER_PORT = String(appPort);
   process.env.ADMIN_EMAILS = ADMIN_EMAIL;
 
   const { NestFactory } = await import('@nestjs/core');
@@ -47,12 +50,12 @@ async function main() {
   const app = await NestFactory.create(AppModule, { logger: false });
   await app.init();
   const server = app.getHttpServer();
-  await new Promise((r) => server.listen(PORT, r));
+  await new Promise((r) => server.listen(appPort, r));
 
   const call = async (method: string, path: string, token?: string, body?: unknown) => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(`http://127.0.0.1:${PORT}${path}`, {
+    const res = await fetch(`http://127.0.0.1:${appPort}${path}`, {
       method, headers, body: body === undefined ? undefined : JSON.stringify(body),
     });
     let data: any = null;
@@ -114,7 +117,7 @@ async function main() {
   // Default: exit cleanly after reporting (so this never hangs CI).
   // Set SERVE=1 to keep the server up for a manual browser E2E.
   if (process.env.SERVE === '1') {
-    console.log(`SERVER UP at http://127.0.0.1:${PORT}`);
+    console.log(`SERVER UP at http://127.0.0.1:${appPort}`);
     console.log(`admin login -> username: ${uname}  password: password123`);
     console.log(`plain login -> username: ${uname2}  password: password123`);
     console.log('SERVE=1 -> keeping server up for browser E2E.');
@@ -129,4 +132,4 @@ async function main() {
   await pg.stop();
 }
 
-main().catch((e) => { console.error('LOCAL SYNC E2E FAILED:', e); process.exit(1); });
+main().then(() => process.exit(0)).catch((e) => { console.error('LOCAL SYNC E2E FAILED:', e); process.exit(1); });

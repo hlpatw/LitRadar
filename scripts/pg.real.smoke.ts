@@ -7,6 +7,9 @@ import { readFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { freePort, hardTimeout } from './lib/test-env.ts';
+
+hardTimeout(180_000, 'pg.real.smoke');
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -17,15 +20,16 @@ const dataDir = mkdtempSync(join(tmpdir(), 'litradar-pg-'));
 const ISSN = '0749-596X'; // Journal of Memory and Language (whitelist)
 
 async function runSteps() {
+  const pgPort = await freePort();
   const pg = new EmbeddedPostgres({
     databaseDir: dataDir,
     user: 'postgres',
     password: 'postgres',
-    port: 54399,
+    port: pgPort,
   });
   await pg.initialise();
   await pg.start();
-  const client = new Client({ connectionString: 'postgres://postgres:postgres@localhost:54399/postgres' });
+  const client = new Client({ connectionString: `postgres://postgres:postgres@localhost:${pgPort}/postgres` });
   await client.connect();
   const q = async (sql: string, params?: any[]) => (await client.query(sql, params)).rows as any[];
 

@@ -7,49 +7,52 @@ import { readFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { freePort, hardTimeout } from './lib/test-env.ts';
 
 process.on('uncaughtException', (e: any) => {
   if (e?.code === 'ECONNRESET' || /read ECONNRESET/.test(e?.message || '')) return;
   console.error('UNCAUGHT:', e);
 });
 
+hardTimeout(180_000, 'e2e.flow');
+
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const migDir = join(root, 'server', 'database', 'migrations');
 const f = (p: string) => readFileSync(p, 'utf8');
 const dataDir = mkdtempSync(join(tmpdir(), 'litradar-e2e-'));
-const PORT = 4597;
 
 async function main() {
-  const pg = new EmbeddedPostgres({ databaseDir: dataDir, user: 'postgres', password: 'postgres', port: 54402 });
+  const pgPort = await freePort();
+  const appPort = await freePort();
+  const pg = new EmbeddedPostgres({ databaseDir: dataDir, user: 'postgres', password: 'postgres', port: pgPort });
   await pg.initialise();
   await pg.start();
-  const conn = 'postgres://postgres:postgres@localhost:54402/postgres';
+  const conn = `postgres://postgres:postgres@localhost:${pgPort}/postgres`;
 
   const { Client } = await import('pg');
   const boot = new Client({ connectionString: conn });
   await boot.connect();
-  await boot.query(f(join(root, 'deploy', 'migration.sql')));
-  for (const m of ['0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql']) {
+  for (const m of ['0000_base.up.sql', '0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql']) {
     await boot.query(f(join(migDir, m)));
   }
   await boot.end();
 
   process.env.DATABASE_URL = conn;
   process.env.JWT_SECRET = 'e2e-secret-at-least-32-characters-long-xx';
-  process.env.SERVER_PORT = String(PORT);
+  process.env.SERVER_PORT = String(appPort);
 
   const { NestFactory } = await import('@nestjs/core');
   const { AppModule } = (await import('../dist/server/app.module.js')) as any;
   const app = await NestFactory.create(AppModule, { logger: false });
   await app.init();
   const server = app.getHttpServer();
-  await new Promise((r) => server.listen(PORT, r));
+  await new Promise((r) => server.listen(appPort, r));
 
   const call = async (method: string, path: string, token?: string, body?: unknown) => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetch(`http://127.0.0.1:${PORT}${path}`, {
+    const res = await fetch(`http://127.0.0.1:${appPort}${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -151,4 +154,4 @@ async function main() {
   }
 }
 
-main().catch((e) => { console.error('E2E FAILED:', e.message); process.exit(1); });
+main().then(() => process.exit(0)).catch((e) => { console.error('E2E FAILED:', e.message); process.exit(1); });
