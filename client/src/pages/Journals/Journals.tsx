@@ -4,6 +4,7 @@ import { journals } from '@/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BookOpen } from 'lucide-react';
 import { Link as UniversalLink } from 'react-router-dom';
+import { ArrowUpRight } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
@@ -61,9 +62,12 @@ function JournalCard({ journal }: { journal: JournalItem }) {
         {SOURCE_TYPE_LABEL[journal.sourceType]}
       </span>
 
-      <h3 className="font-semibold text-[15px] leading-[1.6] text-foreground">
+      <UniversalLink
+        to={`/sources/${journal.id}`}
+        className="font-semibold text-[15px] leading-[1.6] text-foreground hover:text-primary hover:underline"
+      >
         {journal.name}
-      </h3>
+      </UniversalLink>
 
       {journal.description && (
         <p className="text-[14.5px] leading-[1.6] text-muted-foreground line-clamp-3">
@@ -73,14 +77,15 @@ function JournalCard({ journal }: { journal: JournalItem }) {
 
       <div className="mt-auto flex flex-col gap-1 text-[14.5px] leading-[1.6]">
         {journal.url && (
-          <UniversalLink
-            to={journal.url}
+          <a
+            href={journal.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-primary truncate hover:underline"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex w-fit items-center gap-1 text-primary truncate hover:underline"
           >
-            {journal.url}
-          </UniversalLink>
+            官网 <ArrowUpRight className="size-3.5" />
+          </a>
         )}
         {journal.updateFrequency && (
           <span className="text-[13px] text-muted-foreground">

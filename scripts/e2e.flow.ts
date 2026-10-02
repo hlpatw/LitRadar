@@ -33,7 +33,7 @@ async function main() {
   const { Client } = await import('pg');
   const boot = new Client({ connectionString: conn });
   await boot.connect();
-  for (const m of ['0000_base.up.sql', '0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql', '0005_user_library.up.sql', '0006_source_detail_indexes.up.sql']) {
+  for (const m of ['0000_base.up.sql', '0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql', '0005_user_library.up.sql', '0006_source_detail_indexes.up.sql', '0007_source_running_ux.up.sql']) {
     await boot.query(f(join(migDir, m)));
   }
   await boot.end();
@@ -383,7 +383,9 @@ async function main() {
       console.log('[ok] admin sync on skeleton/disabled source -> 400:', badSync.data.message);
     }
 
-    // running protection: plant a 'running' run row, then admin sync -> 409
+    // running protection: plant a FRESH running row, then fire TWO concurrent admin sync
+    // requests. The atomic guard (advisory xact lock + partial unique index) must reject BOTH
+    // (409) and must NOT create a second running row.
     {
       const { Client: PgClient } = await import('pg');
       const dbc = new PgClient({ connectionString: conn });
@@ -393,10 +395,22 @@ async function main() {
          VALUES (gen_random_uuid(), $1, 'crossref', 'running', now(), 0, 0, 0, 'planted for e2e')`,
         [readySource.id],
       );
+      const before = (await dbc.query(`SELECT count(*)::int AS n FROM source_sync_runs WHERE source_id=$1 AND status='running'`, [readySource.id])).rows[0].n;
       await dbc.end();
-      const conflict = await call('POST', `/api/admin/sources/${readySource.id}/sync`, adminToken);
-      if (conflict.status !== 409) throw new Error('admin sync with running run expected 409, got ' + conflict.status + ' ' + JSON.stringify(conflict.data));
-      console.log('[ok] admin sync while a run is running -> 409 (running protection)');
+
+      const [r1, r2] = await Promise.all([
+        call('POST', `/api/admin/sources/${readySource.id}/sync`, adminToken),
+        call('POST', `/api/admin/sources/${readySource.id}/sync`, adminToken),
+      ]);
+      if (r1.status !== 409 || r2.status !== 409)
+        throw new Error(`concurrent syncs should both 409, got ${r1.status} / ${r2.status}`);
+
+      const dbc2 = new PgClient({ connectionString: conn });
+      await dbc2.connect();
+      const after = (await dbc2.query(`SELECT count(*)::int AS n FROM source_sync_runs WHERE source_id=$1 AND status='running'`, [readySource.id])).rows[0].n;
+      await dbc2.end();
+      if (before !== 1 || after !== 1) throw new Error(`running row count must stay 1, before=${before} after=${after}`);
+      console.log('[ok] concurrent admin syncs both 409; running rows stay exactly 1 (atomic guard)');
     }
 
     // per-source runs list (admin) returns full fields

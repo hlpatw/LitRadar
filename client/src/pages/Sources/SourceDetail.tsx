@@ -81,6 +81,7 @@ export default function SourceDetail() {
   const [hasAbstract, setHasAbstract] = useState('');
   const [notInLibrary, setNotInLibrary] = useState(false);
   const [order, setOrder] = useState<'latest' | 'recommend'>('latest');
+  const [busyPaper, setBusyPaper] = useState<string | null>(null);
 
   const fetchDetail = useCallback(() => {
     return getSourceDetail(sourceId)
@@ -123,15 +124,22 @@ export default function SourceDetail() {
     setSearch(searchInput.trim());
   };
 
-  const cycleState = async (paper: SourcePaperItem) => {
-    const next: ReadingState | null =
-      paper.readingState === 'todo' ? 'reading' : paper.readingState === 'reading' ? 'read' : 'todo';
+  const addTodo = async (paper: SourcePaperItem) => {
+    setBusyPaper(paper.id);
     try {
-      await libraryApi.setReadingState(paper.id, next);
-      toast.success(next ? `已设为${STATE_LABEL[next]}` : '已清除阅读状态');
+      // Quick add-to-list: non-downgrade upsert. If already reading/read, the server keeps
+      // the more advanced state and returns the actual row; we surface that, never cycling back.
+      const res = await libraryApi.upsertLibrary(paper.id, { readingState: 'todo' });
+      toast.success(
+        res.readingState && res.readingState !== 'todo'
+          ? `已在书架中（${STATE_LABEL[res.readingState]}），保持当前状态`
+          : '已加入待读',
+      );
       fetchPapers();
     } catch {
       toast.error('操作失败');
+    } finally {
+      setBusyPaper(null);
     }
   };
 
@@ -364,10 +372,23 @@ export default function SourceDetail() {
                 {p.isFavorite && <Star className="size-3.5 fill-[var(--primary)] text-[var(--primary)]" />}
               </div>
               <div className="mt-3 flex items-center gap-2">
-                <Button size="sm" variant="outline" className="h-7 text-xs rounded-[8px]" onClick={() => cycleState(p)}>
-                  <BookOpen className="size-3.5" />
-                  {p.readingState ? STATE_LABEL[p.readingState] : '设为待读'}
-                </Button>
+                {p.readingState ? (
+                  <Button size="sm" variant="outline" className="h-7 text-xs rounded-[8px]" disabled>
+                    <BookOpen className="size-3.5" />
+                    已在书架 · {STATE_LABEL[p.readingState]}
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs rounded-[8px]"
+                    disabled={busyPaper === p.id}
+                    onClick={() => addTodo(p)}
+                  >
+                    <BookOpen className="size-3.5" />
+                    {busyPaper === p.id ? '加入中…' : '加入待读'}
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" className="h-7 text-xs rounded-[8px]" onClick={() => toggleFav(p)}>
                   <Star className={`size-3.5 ${p.isFavorite ? 'fill-[var(--primary)] text-[var(--primary)]' : ''}`} />
                   {p.isFavorite ? '已收藏' : '收藏'}

@@ -74,42 +74,66 @@ export class IngestionService {
       throw new BadRequestException('该来源当前无可用的 Crossref 连接器');
     }
 
-    // Running protection with a stale threshold: a run abandoned mid-flight (e.g. crashed
-    // process) leaves a 'running' row forever. If it is older than the stale threshold we
-    // mark it interrupted and allow a fresh run; a still-fresh running run -> 409.
-    const STALE_MS = 15 * 60 * 1000;
-    const staleCutoff = new Date(Date.now() - STALE_MS);
-    await this.db
-      .update(sourceSyncRuns)
-      .set({ status: 'error', finishedAt: new Date(), message: 'interrupted: stale running run assumed dead' })
-      .where(
-        and(
-          eq(sourceSyncRuns.sourceId, sourceId),
-          eq(sourceSyncRuns.status, 'running'),
-          sql`${sourceSyncRuns.startedAt} < ${staleCutoff.toISOString()}`,
-        ),
-      );
-
-    const [stale] = await this.db
-      .select({ id: sourceSyncRuns.id })
-      .from(sourceSyncRuns)
-      .where(and(eq(sourceSyncRuns.sourceId, sourceId), eq(sourceSyncRuns.status, 'running')))
-      .limit(1);
-    if (stale) {
-      throw new ConflictException('该来源已有正在进行的同步，请稍后再试');
-    }
-
     return this.runCrossrefSync(src, 25);
+  }
+
+  /**
+   * Atomic per-source claim of a 'running' run row. Serialized by a Postgres advisory
+   * transaction lock (keyed off the source id) AND backstopped by the partial unique index
+   * source_sync_running_ux (UNIQUE(source_id) WHERE status='running'). Stale running rows
+   * (older than the threshold) are marked interrupted, then the lock is taken; if a fresh
+   * running row still exists (or the insert conflicts), 409. The running row is committed
+   * inside the lock so a concurrent caller observes it after acquiring the lock.
+   */
+  private async claimRunningRun(src: typeof journals.$inferSelect): Promise<string> {
+    const staleCutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+    try {
+      return await this.db.transaction(async (tx) => {
+        // Serialize concurrent syncs for THIS source (auto-released at COMMIT/ROLLBACK).
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${src.id})::bigint)`);
+
+        // Reap abandoned runs so a crashed run doesn't block forever.
+        await tx
+          .update(sourceSyncRuns)
+          .set({ status: 'error', finishedAt: new Date(), message: 'interrupted: stale running run assumed dead' })
+          .where(
+            and(
+              eq(sourceSyncRuns.sourceId, src.id),
+              eq(sourceSyncRuns.status, 'running'),
+              sql`${sourceSyncRuns.startedAt} < ${staleCutoff}`,
+            ),
+          );
+
+        const [existing] = await tx
+          .select({ id: sourceSyncRuns.id })
+          .from(sourceSyncRuns)
+          .where(and(eq(sourceSyncRuns.sourceId, src.id), eq(sourceSyncRuns.status, 'running')))
+          .limit(1);
+        if (existing) {
+          throw new ConflictException('该来源已有正在进行的同步，请稍后再试');
+        }
+
+        const [run] = await tx
+          .insert(sourceSyncRuns)
+          .values({ sourceId: src.id, connectorType: 'crossref', status: 'running' })
+          .returning({ id: sourceSyncRuns.id });
+        return run.id;
+      });
+    } catch (e: any) {
+      // Partial unique index backstop: even on a stale-cutoff edge, only one INSERT can win;
+      // the loser gets a unique_violation (23505) -> 409.
+      if (e?.code === '23505') {
+        throw new ConflictException('该来源已有正在进行的同步，请稍后再试');
+      }
+      throw e;
+    }
   }
 
   /** Core Crossref incremental pull shared by the ISSN and sourceId entry points. */
   private async runCrossrefSync(src: typeof journals.$inferSelect, rows = 25): Promise<SyncOutcome> {
     const issn = src.issn!;
 
-    const [run] = await this.db
-      .insert(sourceSyncRuns)
-      .values({ sourceId: src.id, connectorType: 'crossref', status: 'running' })
-      .returning({ id: sourceSyncRuns.id });
+    const runId = await this.claimRunningRun(src);
 
     try {
       const { items } = await this.crossref.fetchRecent(
@@ -141,7 +165,7 @@ export class IngestionService {
             publishedDate: item.publishedDate,
             url: item.url,
             fetchedAt: new Date(),
-            sourceRunId: run.id,
+            sourceRunId: runId,
           })
           .onConflictDoUpdate({
             target: papers.doi,
@@ -155,7 +179,7 @@ export class IngestionService {
               publishedDate: item.publishedDate,
               url: item.url,
               fetchedAt: new Date(),
-              sourceRunId: run.id,
+              sourceRunId: runId,
             },
           });
         if (wasNew) inserted += 1;
@@ -171,7 +195,7 @@ export class IngestionService {
           insertedCount: inserted,
           updatedCount: updated,
         })
-        .where(eq(sourceSyncRuns.id, run.id));
+        .where(eq(sourceSyncRuns.id, runId));
 
       await this.db.update(journals).set({ lastSyncedAt: new Date() }).where(eq(journals.id, src.id));
 
@@ -179,7 +203,7 @@ export class IngestionService {
       return {
         sourceId: src.id,
         sourceName: src.name,
-        runId: run.id,
+        runId,
         fetched: items.length,
         inserted,
         updated,
@@ -189,7 +213,7 @@ export class IngestionService {
       await this.db
         .update(sourceSyncRuns)
         .set({ status: 'error', finishedAt: new Date(), message: String((err as Error).message) })
-        .where(eq(sourceSyncRuns.id, run.id));
+        .where(eq(sourceSyncRuns.id, runId));
       throw err;
     }
   }

@@ -29,28 +29,31 @@ function disabledReason(s: SourceRow): string | null {
 }
 
 export default function AdminSources() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [sources, setSources] = useState<SourceRow[]>([]);
   const [runs, setRuns] = useState<Record<string, SyncRunRow[]>>({});
-  const [loading, setLoading] = useState(true);
+  const [listLoading, setListLoading] = useState(true);
   const [syncing, setSyncing] = useState<Record<string, boolean>>({});
 
   const load = useCallback(() => {
     return getSources()
       .then(setSources)
       .catch(() => toast.error('加载来源列表失败'))
-      .finally(() => setLoading(false));
+      .finally(() => setListLoading(false));
   }, []);
 
   useEffect(() => {
+    // Wait until auth has resolved before deciding access, so a briefly-null user during
+    // boot does not flash a redirect.
+    if (authLoading) return;
     if (!user?.isAdmin) {
       toast.error('无权访问来源管理');
       navigate('/');
       return;
     }
     load();
-  }, [user, load, navigate]);
+  }, [user, authLoading, load, navigate]);
 
   const loadRuns = useCallback((id: string) => {
     return adminGetSourceRuns(id)
@@ -104,7 +107,7 @@ export default function AdminSources() {
       </p>
 
       <div className="mt-6 flex flex-col gap-3">
-        {loading
+        {listLoading
           ? Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-16 w-full" />
             ))
