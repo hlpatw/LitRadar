@@ -9,6 +9,30 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freePort, hardTimeout } from './lib/test-env.ts';
 
+// Offline mode (CI sets CROSSREF_OFFLINE=1): the concurrent admin-sync block only asserts
+// the advisory-lock/claim behavior, never the real Crossref payload. Intercept any call to
+// api.crossref.org and resolve an empty result so CI/local never touches the live network.
+// Every other fetch target (the local app under test) passes through untouched.
+if (process.env.CROSSREF_OFFLINE === '1') {
+  const realFetch = globalThis.fetch.bind(globalThis);
+  (globalThis as any).fetch = async (input: any, init?: any) => {
+    const url = typeof input === 'string' ? input : ((input?.url as string) ?? String(input));
+    if (typeof url === 'string' && url.includes('api.crossref.org')) {
+      // Hold the "fetch" long enough for the concurrent-sync race to overlap: the winner
+      // keeps its running row open while the loser blocks on the advisory lock and 409s.
+      await new Promise((r) => setTimeout(r, 500));
+      return {
+        status: 200,
+        statusText: 'OK',
+        ok: true,
+        headers: { 'content-type': 'application/json' },
+        json: async () => ({ status: 'OK', message: { 'total-results': 0, items: [] } }),
+      };
+    }
+    return realFetch(input as any, init as any);
+  };
+}
+
 process.on('uncaughtException', (e: any) => {
   if (e?.code === 'ECONNRESET' || /read ECONNRESET/.test(e?.message || '')) return;
   console.error('UNCAUGHT:', e);

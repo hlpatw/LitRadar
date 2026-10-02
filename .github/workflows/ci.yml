@@ -5,8 +5,15 @@ on:
     branches: [main, feat/**]
   pull_request:
 
+# Deterministic, fully offline gate sequence. No live Crossref: CROSSREF_OFFLINE=1 makes the
+# e2e admin-sync block assert only the advisory-lock behavior with a stubbed empty response,
+# and the scheduler gate constructs its own FAKE ingestion (no outbound network at all).
+# Each step runs as its own process on an ephemeral port and has a hard wall-clock timeout.
+env:
+  CROSSREF_OFFLINE: "1"
+
 jobs:
-  test:
+  gates:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,9 +21,48 @@ jobs:
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund --legacy-peer-deps
-      - name: Unit tests (cross-platform)
+
+      # 1) Unit tests (pure, pg-mem, no dist / no embedded Postgres).
+      - name: Unit tests
         run: npm test
+        timeout-minutes: 5
+
+      # 2) Build (server emits dist/ that the dist-gates below import).
       - name: Build server
         run: npm run build:server
+        timeout-minutes: 8
       - name: Build client
         run: npm run build:client
+        timeout-minutes: 8
+
+      # 3) Migration fixtures against real embedded Postgres, incl. the 0008 round-trip
+      #    (weekly_radar_snapshots / behavior_events / scheduler_state), plus the 0005
+      #    library-backfill suite.
+      - name: Migration fixtures (incl 0008)
+        run: npm run test:migrations
+        timeout-minutes: 6
+
+      # 4) Production DI graph boots (CrossrefConnector resolves through the injector).
+      - name: DI startup
+        run: npm run test:di
+        timeout-minutes: 4
+
+      # 5) HTTP routing + sources smoke against embedded Postgres + compiled app.
+      - name: HTTP routes
+        run: npm run test:http
+        timeout-minutes: 4
+
+      # 6) Full authenticated user-journey regression (offline; no live Crossref).
+      - name: E2E flow
+        run: npm run test:e2e
+        timeout-minutes: 6
+
+      # 7) Radar week-anchor boundary pins (Mon-00:00-CST == Sun-16:00-UTC).
+      - name: Radar week gate
+        run: npm run test:radar-week
+        timeout-minutes: 3
+
+      # 8) Scheduler enabled-path gates against embedded Postgres with FAKE ingestion.
+      - name: Scheduler gates
+        run: npm run test:scheduler-gates
+        timeout-minutes: 5

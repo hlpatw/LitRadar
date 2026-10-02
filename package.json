@@ -9,12 +9,14 @@
     "build:server": "node scripts/gen-version.mjs && cross-env NODE_ENV=production nest build",
     "build:client": "cross-env NODE_ENV=production vite build --config vite.config.ts",
     "start": "cross-env NODE_ENV=production node dist/server/main.js",
-    "test": "node --experimental-strip-types --test",
+    "test": "node --experimental-strip-types --test \"test/**/*.test.ts\"",
     "test:pg": "node --experimental-strip-types scripts/pg.real.smoke.ts",
     "test:di": "node --experimental-strip-types scripts/di.startup.ts",
     "test:http": "node --experimental-strip-types scripts/http.routes.ts",
-    "test:migrations": "node --experimental-strip-types scripts/migration.fixtures.ts",
+    "test:migrations": "node --experimental-strip-types scripts/migration.fixtures.ts && node --experimental-strip-types scripts/library.migration.test.ts",
     "test:e2e": "node --experimental-strip-types scripts/e2e.flow.ts",
+    "test:radar-week": "node --experimental-strip-types scripts/radar.week.test.ts",
+    "test:scheduler-gates": "node --experimental-strip-types scripts/scheduler.gates.ts",
     "migrate": "node --experimental-strip-types scripts/migrate.ts"
   },
   "dependencies": {
