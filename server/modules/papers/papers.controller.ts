@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/auth.guard';
+import { AdminOrCliGuard } from '../../common/guards/admin.guard';
 import { PapersService } from './papers.service';
 import { CreatePaperDto, UpdatePaperDto } from './dto/paper.dto';
 import type {
@@ -26,6 +27,13 @@ import type {
 @Controller('api/papers')
 export class PapersController {
   constructor(private readonly papersService: PapersService) {}
+
+  // Writes (create/update/delete) are admin-or-CLI only. Reads (list/detail) keep their
+  // existing login/no-login boundaries. A normal logged-in user gets 403 on writes.
+  private actorId(req: Request): string {
+    // CLI path (x-admin-token) never sets req.user; attribute to 'cli'.
+    return (req.user as { userId?: string } | undefined)?.userId ?? 'cli';
+  }
 
   @UseGuards(JwtAuthGuard)
   @Get()
@@ -71,29 +79,27 @@ export class PapersController {
     return this.papersService.detail(id);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AdminOrCliGuard)
   @Post()
   @HttpCode(201)
   async create(
     @Req() req: Request,
     @Body() dto: CreatePaperDto,
   ): Promise<PaperItem> {
-    const { userId } = req.user as { userId: string };
-    return this.papersService.create(dto, userId);
+    return this.papersService.create(dto, this.actorId(req));
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AdminOrCliGuard)
   @Patch(':id')
   async update(
     @Req() req: Request,
     @Param('id') id: string,
     @Body() dto: UpdatePaperDto,
   ): Promise<PaperItem> {
-    const { userId } = req.user as { userId: string };
-    return this.papersService.update(id, dto, userId);
+    return this.papersService.update(id, dto, this.actorId(req));
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(AdminOrCliGuard)
   @Delete(':id')
   @HttpCode(204)
   async delete(@Param('id') id: string): Promise<void> {

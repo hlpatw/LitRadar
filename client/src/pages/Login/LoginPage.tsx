@@ -54,6 +54,7 @@ export default function LoginPage() {
               value={username}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
               required
+              autoComplete="username"
               className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[14.5px] text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
               placeholder="输入用户名"
             />
@@ -68,6 +69,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[14.5px] text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
               placeholder="输入密码"
             />

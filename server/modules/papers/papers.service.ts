@@ -143,7 +143,10 @@ export class PapersService {
       })
       .onConflictDoUpdate({
         target: papers.doi,
-        targetWhere: sql`doi IS NOT NULL`,
+        // Must EXACTLY match the partial-unique index papers_doi_unique predicate
+        // (0001_sources.up.sql / schema.ts): ON CONFLICT inference requires the WHERE
+        // clause to equal the index predicate, otherwise Postgres raises 42P10.
+        targetWhere: sql`doi IS NOT NULL AND doi <> ''`,
         set: {
           title: dto.title.trim(),
           authors: dto.authors ?? null,
