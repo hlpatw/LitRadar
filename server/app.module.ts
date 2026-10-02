@@ -11,6 +11,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { SourcesModule } from './modules/sources/sources.module';
 import { ConnectorsModule } from './modules/connectors/connectors.module';
 import { HealthModule } from './modules/health/health.module';
+import { VersionModule } from './modules/version/version.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { HealthModule } from './modules/health/health.module';
     SourcesModule,
     ConnectorsModule,
     HealthModule,
+    VersionModule,
   ],
   providers: [
     {

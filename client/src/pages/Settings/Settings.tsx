@@ -7,10 +7,21 @@ import { Input } from '@client/src/components/ui/input';
 import { Textarea } from '@client/src/components/ui/textarea';
 import { Spinner } from '@client/src/components/ui/spinner';
 import { workspace } from '@client/src/api';
+import api from '@client/src/utils/axios';
 import type { UserSettings, UpdateSettingsRequest } from '@shared/api.interface';
+
+interface VersionInfo {
+  environment: string;
+  commit: string;
+  buildTime: string | null;
+  migrationVersion: string;
+  migrationsApplied: number;
+  frontend: { bundle: string | null };
+}
 
 export default function Settings() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [version, setVersion] = useState<VersionInfo | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
@@ -34,6 +45,10 @@ export default function Settings() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    api.get('/version').then((r) => setVersion(r.data)).catch(() => setVersion(null));
   }, []);
 
   useEffect(() => {
@@ -148,6 +163,30 @@ export default function Settings() {
             </div>
           </div>
         </form>
+
+        {version && (
+          <div className="mt-[40px] rounded-[10px] border border-border bg-card p-[22px_24px]">
+            <label className="font-mono text-[10.5px] tracking-[0.06em] uppercase text-muted-foreground">
+              版本信息
+            </label>
+            <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-[13.5px]">
+              <dt className="text-muted-foreground">环境</dt>
+              <dd className="font-mono text-xs">{version.environment}</dd>
+              <dt className="text-muted-foreground">提交</dt>
+              <dd className="font-mono text-xs">{version.commit}</dd>
+              <dt className="text-muted-foreground">构建时间</dt>
+              <dd className="font-mono text-xs">
+                {version.buildTime ? new Date(version.buildTime).toLocaleString() : '—'}
+              </dd>
+              <dt className="text-muted-foreground">数据库迁移</dt>
+              <dd className="font-mono text-xs">
+                {version.migrationVersion} ({version.migrationsApplied})
+              </dd>
+              <dt className="text-muted-foreground">前端包</dt>
+              <dd className="font-mono text-xs">{version.frontend.bundle ?? 'dev'}</dd>
+            </dl>
+          </div>
+        )}
       </div>
     </div>
   );

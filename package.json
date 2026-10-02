@@ -6,13 +6,15 @@
     "dev:server": "cross-env NODE_ENV=development nest start --watch",
     "dev:client": "cross-env NODE_ENV=development vite --config vite.config.ts",
     "build": "npm run build:server && npm run build:client",
-    "build:server": "cross-env NODE_ENV=production nest build",
+    "build:server": "node scripts/gen-version.mjs && cross-env NODE_ENV=production nest build",
     "build:client": "cross-env NODE_ENV=production vite build --config vite.config.ts",
     "start": "cross-env NODE_ENV=production node dist/server/main.js",
     "test": "node --experimental-strip-types --test",
     "test:pg": "node --experimental-strip-types scripts/pg.real.smoke.ts",
     "test:di": "node --experimental-strip-types scripts/di.startup.ts",
     "test:http": "node --experimental-strip-types scripts/http.routes.ts",
+    "test:migrations": "node --experimental-strip-types scripts/migration.fixtures.ts",
+    "test:e2e": "node --experimental-strip-types scripts/e2e.flow.ts",
     "migrate": "node --experimental-strip-types scripts/migrate.ts"
   },
   "dependencies": {

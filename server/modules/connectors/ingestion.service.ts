@@ -1,9 +1,10 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray, sql, desc } from 'drizzle-orm';
 import { DATABASE, type Database } from '../../database/database.module';
 import { journals, papers, sourceSyncRuns } from '../../database/schema';
 import { CrossrefConnector } from './crossref.connector';
 import { normalizeDoi } from '../../common/utils/doi.util';
+import { CROSSREF_READY_ISSNS } from '../sources/mvp.sources';
 
 export interface SyncOutcome {
   sourceId: string;
@@ -13,6 +14,20 @@ export interface SyncOutcome {
   inserted: number;
   updated: number;
   status: 'ok' | 'error';
+}
+
+export interface SyncRunRow {
+  id: string;
+  sourceId: string;
+  sourceName: string | null;
+  connectorType: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  fetchedCount: number;
+  insertedCount: number;
+  updatedCount: number;
+  message: string | null;
 }
 
 @Injectable()
@@ -122,5 +137,58 @@ export class IngestionService {
         .where(eq(sourceSyncRuns.id, run.id));
       throw err;
     }
+  }
+
+  /**
+   * Manual, admin-gated, on-demand pull of every Crossref-ready MVP journal.
+   * There is NO scheduler: this only runs when an operator calls it. Per-source
+   * errors are isolated so one failing venue does not abort the rest.
+   */
+  async syncAllReady(): Promise<SyncOutcome[]> {
+    const outcomes: SyncOutcome[] = [];
+    for (const issn of CROSSREF_READY_ISSNS) {
+      try {
+        outcomes.push(await this.syncSourceByIssn(issn));
+      } catch (err) {
+        this.logger.error(`sync-all failed for ISSN ${issn}: ${(err as Error).message}`);
+      }
+    }
+    return outcomes;
+  }
+
+  /** Recent sync runs joined with the source name, newest first (for the UI status panel). */
+  async listRuns(limit = 50): Promise<SyncRunRow[]> {
+    const rows = await this.db
+      .select({
+        id: sourceSyncRuns.id,
+        sourceId: sourceSyncRuns.sourceId,
+        sourceName: journals.name,
+        connectorType: sourceSyncRuns.connectorType,
+        status: sourceSyncRuns.status,
+        startedAt: sourceSyncRuns.startedAt,
+        finishedAt: sourceSyncRuns.finishedAt,
+        fetchedCount: sourceSyncRuns.fetchedCount,
+        insertedCount: sourceSyncRuns.insertedCount,
+        updatedCount: sourceSyncRuns.updatedCount,
+        message: sourceSyncRuns.message,
+      })
+      .from(sourceSyncRuns)
+      .leftJoin(journals, eq(sourceSyncRuns.sourceId, journals.id))
+      .orderBy(desc(sourceSyncRuns.startedAt))
+      .limit(Math.min(Math.max(limit, 1), 200));
+
+    return rows.map((r) => ({
+      id: r.id,
+      sourceId: r.sourceId,
+      sourceName: r.sourceName,
+      connectorType: r.connectorType,
+      status: r.status,
+      startedAt: (r.startedAt as Date).toISOString(),
+      finishedAt: r.finishedAt ? (r.finishedAt as Date).toISOString() : null,
+      fetchedCount: r.fetchedCount,
+      insertedCount: r.insertedCount,
+      updatedCount: r.updatedCount,
+      message: r.message,
+    }));
   }
 }

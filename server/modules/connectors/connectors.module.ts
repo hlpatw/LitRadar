@@ -1,9 +1,9 @@
-import { Module } from '@nestjs/common';
-import { Controller, Post, Param, UseGuards, HttpCode, BadRequestException } from '@nestjs/common';
+import { Module, Controller, Get, Post, Param, UseGuards, HttpCode, BadRequestException, Query } from '@nestjs/common';
 import { AdminOrCliGuard } from '../../common/guards/admin.guard';
+import { JwtAuthGuard } from '../auth/auth.guard';
 import { CrossrefConnector } from './crossref.connector';
-import { IngestionService, SyncOutcome } from './ingestion.service';
-import { getMvpSourceByIssn, isCrossrefReady } from '../sources/mvp.sources';
+import { IngestionService, SyncOutcome, SyncRunRow } from './ingestion.service';
+import { isCrossrefReady } from '../sources/mvp.sources';
 
 @Controller('api/connectors')
 export class ConnectorsController {
@@ -22,6 +22,22 @@ export class ConnectorsController {
       );
     }
     return this.ingestion.syncSourceByIssn(issn);
+  }
+
+  // Manual trigger for ALL 7 Crossref-ready sources at once. Admin-or-CLI only.
+  // No scheduler exists; this is the only way bulk sync runs.
+  @UseGuards(AdminOrCliGuard)
+  @Post('sync-all')
+  @HttpCode(200)
+  syncAll(): Promise<SyncOutcome[]> {
+    return this.ingestion.syncAllReady();
+  }
+
+  // Read-only sync-run status. Any authenticated user may view run history.
+  @UseGuards(JwtAuthGuard)
+  @Get('runs')
+  runs(@Query('limit') limit?: string): Promise<SyncRunRow[]> {
+    return this.ingestion.listRuns(limit ? Number(limit) : 50);
   }
 }
 
