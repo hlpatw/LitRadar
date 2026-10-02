@@ -120,7 +120,9 @@ export default function RadarSection() {
       {loading ? (
         <p className="mt-4 text-[14.5px] text-[var(--muted-foreground)]">加载中…</p>
       ) : !snapshot || snapshot.items.length === 0 ? (
-        <p className="mt-4 text-[14.5px] text-[var(--muted-foreground)]">本周暂无雷达结果。</p>
+        <p className="mt-4 text-[14.5px] text-[var(--muted-foreground)]">
+          {snapshot ? `周起始 ${snapshot.weekStart} 暂无 Top10 结果。` : '暂无雷达结果。'}
+        </p>
       ) : (
         <>
           <p className="mt-1 font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--muted-foreground)]">

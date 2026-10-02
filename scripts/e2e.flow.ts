@@ -490,6 +490,28 @@ async function main() {
     if (!Array.isArray(radar1.data.current.items)) throw new Error('radar items not array');
     console.log('[ok] GET /api/radar/current -> week', radar1.data.current.weekStart, 'items=' + radar1.data.current.items.length);
 
+    // Previous-week snapshot MUST exist (boot-safe deterministic backfill): a real, persisted,
+    // selectable row for the immediately-previous ISO Shanghai week, carrying its own digest.
+    // It may have an empty Top10 / newPaperCount=0, but it must NEVER come back null.
+    if (!radar1.data.previous) throw new Error('previous-week radar snapshot must exist (boot-safe backfill), got null');
+    if (radar1.data.previous.isCurrent !== false) throw new Error('previous snapshot must report isCurrent=false, got ' + radar1.data.previous.isCurrent);
+    if (typeof radar1.data.previous.generatedAt !== 'string') throw new Error('previous snapshot must have a persisted digest (generatedAt)');
+    if (!Array.isArray(radar1.data.previous.items) || !Array.isArray(radar1.data.previous.sourceDistribution) || !Array.isArray(radar1.data.previous.keywordHits))
+      throw new Error('previous snapshot missing aggregate arrays');
+    if (typeof radar1.data.previous.newPaperCount !== 'number') throw new Error('previous snapshot missing newPaperCount');
+    // previous week key must be exactly current.weekStart minus 7 days (ISO Shanghai Monday).
+    const curMon = new Date(radar1.data.current.weekStart + 'T00:00:00Z');
+    const prevMon = new Date(radar1.data.previous.weekStart + 'T00:00:00Z');
+    const diffDays = Math.round((curMon.getTime() - prevMon.getTime()) / 86400000);
+    if (diffDays !== 7) throw new Error(`previous week must be exactly 7 days before current (cur=${radar1.data.current.weekStart} prev=${radar1.data.previous.weekStart})`);
+    console.log('[ok] previous-week snapshot persisted + selectable: week', radar1.data.previous.weekStart, 'items=' + radar1.data.previous.items.length, 'new=' + radar1.data.previous.newPaperCount, 'digest=' + radar1.data.previous.generatedAt);
+
+    // Idempotent: a second read returns the SAME frozen previous row (not regenerated).
+    const radar1b = await call('GET', '/api/radar/current', token);
+    if (radar1b.data.previous.weekStart !== radar1.data.previous.weekStart) throw new Error('previous weekStart changed between reads (should be frozen)');
+    if (radar1b.data.previous.generatedAt !== radar1.data.previous.generatedAt) throw new Error('previous snapshot regenerated on read (must be frozen/idempotent)');
+    console.log('[ok] previous-week snapshot frozen: repeat read returns identical weekStart + digest');
+
     // POST /generate must be ADMIN-only: a regular user gets 403.
     const genForbidden = await call('POST', '/api/radar/generate', token);
     if (genForbidden.status !== 403) throw new Error('non-admin radar generate expected 403, got ' + genForbidden.status);
@@ -509,6 +531,18 @@ async function main() {
       if (it.paper.journalName === undefined || it.paper.publishedDate === undefined) throw new Error('radar item missing source/date');
     }
     console.log('[ok] radar deterministic: same weekStart + identical order after admin regenerate');
+
+    // Admin/internal backfill endpoint: idempotent, keeps the existing frozen previous week,
+    // and is gated to admins (regular user -> 403).
+    const backfill = await call('POST', '/api/radar/backfill', adminToken);
+    if (backfill.status !== 200 && backfill.status !== 201) throw new Error('admin radar backfill -> ' + backfill.status + ' ' + JSON.stringify(backfill.data));
+    if (!backfill.data.previous || backfill.data.previous.weekStart !== radar1.data.previous.weekStart)
+      throw new Error('backfill must preserve the existing previous-week snapshot');
+    if (!backfill.data.current || backfill.data.current.weekStart !== radar1.data.current.weekStart)
+      throw new Error('backfill must preserve the current-week snapshot');
+    const backfillForbidden = await call('POST', '/api/radar/backfill', token);
+    if (backfillForbidden.status !== 403) throw new Error('non-admin radar backfill expected 403, got ' + backfillForbidden.status);
+    console.log('[ok] POST /api/radar/backfill admin-only, idempotent, preserves current+previous frozen weeks');
 
     // ── (E) WEEKLY DIGEST ───────────────────────────────────────────────────
     const digest = await call('GET', '/api/digest/current', token);
@@ -557,12 +591,53 @@ async function main() {
     if (libA.data.recorded !== true || libB.data.recorded !== false) throw new Error('library should record first only');
     console.log('[ok] library: first association recorded=true, pure re-update recorded=false');
 
-    const noteKey = `${wk}:note:${adminPaperId}`;
-    const noteEv = await call('POST', '/api/events', token, { eventType: 'note', paperId: adminPaperId, idempotencyKey: noteKey });
-    if (noteEv.data.recorded !== true) throw new Error('note event should record');
+    // ── NOTE EVENT: privacy-safe, success-only, idempotent. The notes API itself MUST NOT
+    // auto-emit a behavior event; only the client's post-success POST /api/events counts,
+    // and only once per explicit key. Content/tags never travel on the event.
+    // The earlier admin paper was deleted above, but user_notes enforces a real paper FK (the
+    // events table does not), so create a fresh, keep-alive paper to anchor the inline note.
+    const noteTarget = await call('POST', '/api/papers', adminToken, { title: 'Inline note target paper', keywords: 'priming', abstractText: 'Inline note target abstract.', url: 'https://example.org/notetarget' });
+    if (noteTarget.status !== 201) throw new Error('note-target paper create -> ' + noteTarget.status + ' ' + JSON.stringify(noteTarget.data));
+    const notePaperId = noteTarget.data.id;
+    const noteKey = `${wk}:note:${notePaperId}`;
+
+    // Baseline: how many `note` behavior events does this user have this week?
+    const digestBase0 = await call('GET', '/api/digest/current', token);
+    const noteCountBase = digestBase0.data.userActionCounts.note;
+
+    // (a) Creating a note via the notes API must NOT itself emit a note event.
+    const inlineNote = await call('POST', '/api/workspace/notes', token, { content: 'inline paper-detail note body', paperId: notePaperId });
+    if (inlineNote.status !== 200 && inlineNote.status !== 201) throw new Error('inline note create -> ' + inlineNote.status + ' ' + JSON.stringify(inlineNote.data));
+    if (!inlineNote.data.id) throw new Error('created note missing id: ' + JSON.stringify(inlineNote.data));
+    const afterNoteCreate = await call('GET', '/api/digest/current', token);
+    if (afterNoteCreate.data.userActionCounts.note !== noteCountBase)
+      throw new Error(`note create must not auto-emit a note event: baseline=${noteCountBase} afterCreate=${afterNoteCreate.data.userActionCounts.note}`);
+
+    // (b) Updating that note must NOT count as a create (update path is invisible to the counter).
+    const updNote = await call('PATCH', `/api/workspace/notes/${inlineNote.data.id}`, token, { content: 'inline paper-detail note body (edited)' });
+    if (updNote.status !== 200) throw new Error('note update -> ' + updNote.status + ' ' + JSON.stringify(updNote.data));
+    const afterNoteUpdate = await call('GET', '/api/digest/current', token);
+    if (afterNoteUpdate.data.userActionCounts.note !== noteCountBase)
+      throw new Error(`note update path must not count as a create: baseline=${noteCountBase} afterUpdate=${afterNoteUpdate.data.userActionCounts.note}`);
+
+    // (c) Only the client's explicit post-success event increments the counter — exactly once.
+    const noteEv = await call('POST', '/api/events', token, { eventType: 'note', paperId: notePaperId, idempotencyKey: noteKey });
+    if (noteEv.data.recorded !== true) throw new Error('note event should record, got ' + JSON.stringify(noteEv.data));
+    const afterNoteEvent = await call('GET', '/api/digest/current', token);
+    if (afterNoteEvent.data.userActionCounts.note !== noteCountBase + 1)
+      throw new Error(`note event should +1: base=${noteCountBase} after=${afterNoteEvent.data.userActionCounts.note}`);
+
+    // (d) Idempotent replay of the SAME key does not double-count (the failure/dupe case).
+    const noteDup = await call('POST', '/api/events', token, { eventType: 'note', paperId: notePaperId, idempotencyKey: noteKey });
+    if (noteDup.data.recorded !== false) throw new Error('duplicate note event must dedupe (recorded=false), got ' + JSON.stringify(noteDup.data));
+    const afterNoteDup = await call('GET', '/api/digest/current', token);
+    if (afterNoteDup.data.userActionCounts.note !== noteCountBase + 1)
+      throw new Error(`duplicate note event must not double-count: ${afterNoteDup.data.userActionCounts.note}`);
+
+    // (e) Free-standing note (paperId=null) is its own key; still carries no content/tags.
     const freeNote = await call('POST', '/api/events', token, { eventType: 'note', paperId: null, idempotencyKey: `${wk}:note:none` });
     if (freeNote.data.recorded !== true) throw new Error('free note (paperId=null) should record');
-    console.log('[ok] note: success recorded, paperId=null free-note allowed, no content sent');
+    console.log('[ok] note: note API never auto-emits; client event +1, duplicate idempotent, update invisible, paperId=null ok, no content/tags');
 
     const badKey = await call('POST', '/api/events', token, { eventType: 'favorite', paperId: adminPaperId, idempotencyKey: 123 });
     if (badKey.status !== 400) throw new Error('non-string idempotencyKey should 400, got ' + badKey.status);

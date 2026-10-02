@@ -65,6 +65,9 @@ export class RadarService {
    */
   async generateSnapshot(weekStart: Date = isoWeekStart()): Promise<WeeklyRadarSnapshot> {
     const ws = weekStartKey(weekStart);
+    // A snapshot is "current" iff its week is THIS ISO Shanghai week — not merely because we
+    // just (back)filled it. The previous week, backfilled on read, must report isCurrent=false.
+    const isCurrentWeek = ws === weekStartKey(isoWeekStart());
 
     // Already frozen for this week -> return the immutable snapshot (do not recompute).
     const [existing] = await this.db
@@ -72,7 +75,7 @@ export class RadarService {
       .from(weeklyRadarSnapshots)
       .where(eq(weeklyRadarSnapshots.weekStart, ws))
       .limit(1);
-    if (existing) return this.toSnapshot(existing, false);
+    if (existing) return this.toSnapshot(existing, isCurrentWeek);
 
     // Real UTC instants for the week boundaries: Mon 00:00 CST == Sun 16:00 UTC.
     // Comparing timestamptz against these (NOT ::date) avoids an 8h off-by-one from the
@@ -198,10 +201,15 @@ export class RadarService {
       .onConflictDoNothing();
 
     this.logger.log(`radar snapshot frozen for week ${ws}: ${items.length} papers, new=${newCountRow?.n ?? 0}`);
-    return this.toSnapshot(
-      { weekStart: ws, newPaperCount: newCountRow?.n ?? 0, top10, sourceDistribution, keywordHits, generatedAt: new Date() } as any,
-      true,
-    );
+    // Re-read the frozen row so the response carries the PERSISTED generatedAt (not a fresh
+    // clock). ON CONFLICT DO NOTHING means a racing request may have won the insert; either
+    // way we return the immutable stored row, making repeat reads byte-stable.
+    const [frozen] = await this.db
+      .select()
+      .from(weeklyRadarSnapshots)
+      .where(eq(weeklyRadarSnapshots.weekStart, ws))
+      .limit(1);
+    return this.toSnapshot(frozen!, isCurrentWeek);
   }
 
   private toSnapshot(row: typeof weeklyRadarSnapshots.$inferSelect, isCurrent: boolean): WeeklyRadarSnapshot {
@@ -230,18 +238,27 @@ export class RadarService {
     };
   }
 
-  /** Current week (lazy-generate if missing) plus the previous frozen week for history. */
+  /**
+   * Current week (lazy-generated, deterministic) PLUS the previous frozen week for history.
+   * Boot-safe: if the previous ISO-Shanghai week has no frozen row yet, we deterministically
+   * backfill one from the REAL corpus rather than returning `previous: null`. No papers are
+   * fabricated — when nothing existed for that window the row legitimately has an empty Top10
+   * and newPaperCount=0, but it is still a persisted, selectable snapshot carrying its own
+   * digest (generatedAt). The write is idempotent (ON CONFLICT DO NOTHING) and does NOT alter
+   * the scheduler's cadence — this is purely lazy/backfill generation on read.
+   */
   async getCurrentAndPrevious(): Promise<RadarHistoryResponse> {
     const current = await this.generateSnapshot(isoWeekStart());
-    const prevStart = weekStartKey(addWeeks(isoWeekStart(), -1));
+    const prevDate = addWeeks(isoWeekStart(), -1);
+    const prevKey = weekStartKey(prevDate);
     const [prevRow] = await this.db
       .select()
       .from(weeklyRadarSnapshots)
-      .where(eq(weeklyRadarSnapshots.weekStart, prevStart))
+      .where(eq(weeklyRadarSnapshots.weekStart, prevKey))
       .limit(1);
-    return {
-      current,
-      previous: prevRow ? this.toSnapshot(prevRow, false) : null,
-    };
+    const previous = prevRow
+      ? this.toSnapshot(prevRow, false)
+      : await this.generateSnapshot(prevDate);
+    return { current, previous };
   }
 }

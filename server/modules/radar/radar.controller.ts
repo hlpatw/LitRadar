@@ -21,4 +21,15 @@ export class RadarController {
   async generate(): Promise<WeeklyRadarSnapshot> {
     return this.radar.generateSnapshot();
   }
+
+  /**
+   * Admin/internal only: deterministically ensure BOTH the current and the immediately-previous
+   * ISO-Shanghai weeks have a persisted, selectable snapshot (boot-safe backfill). Idempotent —
+   * existing frozen rows are never recomputed. Does NOT change scheduler cadence.
+   */
+  @UseGuards(AdminOrCliGuard)
+  @Post('backfill')
+  async backfill(): Promise<RadarHistoryResponse> {
+    return this.radar.getCurrentAndPrevious();
+  }
 }

@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
+import { trackNote } from '@/utils/events';
 import {
   Dialog,
   DialogContent,
@@ -153,6 +154,10 @@ const PaperDetailPage: React.FC = () => {
     setSavingNote(true);
     try {
       await workspace.createNote({ paperId: paper.id, content: noteDraft.trim() });
+      // Privacy-safe behavior event: fired ONLY after the note create succeeded.
+      // Carries paperId + explicit week key only — never content/tags.
+      // (Editing/updating a note elsewhere does NOT re-emit this create event.)
+      trackNote(paper.id);
       setNoteDraft('');
       const allNotes = await workspace.getNotes();
       setNotes(allNotes.filter((n: NoteItem) => n.paperId === paper.id));
