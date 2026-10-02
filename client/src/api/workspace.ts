@@ -1,10 +1,15 @@
 ﻿import api from '../utils/axios';
-import type { FavoriteItem, ChecklistItem, NoteItem, UserSettings, DashboardStats, CreateChecklistRequest, UpdateChecklistRequest, CreateNoteRequest, UpdateNoteRequest, UpdateSettingsRequest } from '@shared/api.interface';
+import type { FavoriteItem, ChecklistItem, NoteItem, UserSettings, DashboardStats, CreateChecklistRequest, UpdateChecklistRequest, CreateNoteRequest, UpdateNoteRequest, UpdateSettingsRequest, Overview } from '@shared/api.interface';
 
 const BASE = '/workspace';
 
 export async function getDashboard(): Promise<DashboardStats> {
   const res = await api.get(`${BASE}/dashboard`);
+  return res.data;
+}
+
+export async function getOverview(): Promise<Overview> {
+  const res = await api.get(`${BASE}/overview`);
   return res.data;
 }
 

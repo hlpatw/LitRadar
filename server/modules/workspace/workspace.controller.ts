@@ -26,6 +26,7 @@ import type {
   UpdateNoteRequest,
   UpdateSettingsRequest,
   CreateFavoriteRequest,
+  Overview,
 } from '@shared/api.interface';
 
 @Controller('api/workspace')
@@ -39,6 +40,13 @@ export class WorkspaceController {
   async getDashboard(@Req() req: Request): Promise<DashboardStats> {
     const userId = getAuthenticatedUserId(req);
     return this.workspaceService.getDashboard(userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('overview')
+  async getOverview(@Req() req: Request): Promise<Overview> {
+    const userId = getAuthenticatedUserId(req);
+    return this.workspaceService.getOverview(userId);
   }
 
   // ── Favorites ──

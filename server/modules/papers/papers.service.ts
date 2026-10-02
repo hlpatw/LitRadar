@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DATABASE, type Database } from '../../database/database.module';
-import { eq, and, ilike, count, sql } from 'drizzle-orm';
+import { eq, and, ilike, count, sql, gte, lte } from 'drizzle-orm';
 import { papers, journals } from '../../database/schema';
 import { isValidUuid, normalizeDoi, isValidDoi } from '../../common/utils/doi.util';
 import type {
@@ -16,6 +16,17 @@ import type {
   PaginatedResponse,
 } from '@shared/api.interface';
 
+export interface PaperFilters {
+  journalId?: string;
+  search?: string;
+  from?: string; // inclusive lower bound on published_date
+  to?: string; // inclusive upper bound on published_date
+  priority?: string; // P0..P3 on the source
+  hasAbstract?: boolean; // true = only with abstract, false = only without
+  favorite?: boolean; // scoped to current user
+  todo?: boolean; // in current user's reading checklist
+}
+
 @Injectable()
 export class PapersService {
   constructor(
@@ -23,18 +34,34 @@ export class PapersService {
   ) {}
 
   async list(
-    journalId: string | undefined,
-    search: string | undefined,
+    filters: PaperFilters,
+    userId: string | undefined,
     page: number = 1,
     pageSize: number = 20,
   ): Promise<PaginatedResponse<PaperItem>> {
     const safePageSize = Math.min(Math.max(pageSize, 1), 50);
     const safePage = Math.max(page, 1);
 
-    const conditions: ReturnType<typeof eq>[] = [];
-    if (journalId) conditions.push(eq(papers.journalId, journalId));
-    if (search && search.trim().length > 0) {
-      conditions.push(ilike(papers.title, `%${search.trim()}%`));
+    const conditions: any[] = [];
+    if (filters.journalId) conditions.push(eq(papers.journalId, filters.journalId));
+    if (filters.search && filters.search.trim().length > 0) {
+      const term = `%${filters.search.trim()}%`;
+      conditions.push(
+        sql`(${papers.title} ilike ${term} OR ${papers.abstractText} ilike ${term})`,
+      );
+    }
+    if (filters.from) conditions.push(gte(papers.publishedDate, filters.from));
+    if (filters.to) conditions.push(lte(papers.publishedDate, filters.to));
+    if (filters.priority) {
+      conditions.push(sql`EXISTS (SELECT 1 FROM journals j WHERE j.id = ${papers.journalId} AND j.priority = ${filters.priority})`);
+    }
+    if (filters.hasAbstract === true) conditions.push(sql`${papers.abstractText} IS NOT NULL`);
+    if (filters.hasAbstract === false) conditions.push(sql`${papers.abstractText} IS NULL`);
+    if (filters.favorite && userId) {
+      conditions.push(sql`EXISTS (SELECT 1 FROM user_favorites f WHERE f.paper_id = ${papers.id} AND f.user_id = ${userId})`);
+    }
+    if (filters.todo && userId) {
+      conditions.push(sql`EXISTS (SELECT 1 FROM reading_checklist c WHERE c.paper_id = ${papers.id} AND c.user_id = ${userId})`);
     }
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -83,6 +110,7 @@ export class PapersService {
     return {
       ...this.mapToPaperItem(row.papers),
       journalName: row.journals?.name ?? null,
+      fetchedAt: row.papers.fetchedAt ? row.papers.fetchedAt.toISOString() : null,
     };
   }
 

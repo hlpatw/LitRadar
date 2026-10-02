@@ -6,6 +6,7 @@ interface User {
   username: string;
   email: string;
   displayName: string | null;
+  isAdmin: boolean;
 }
 
 interface AuthContextValue {

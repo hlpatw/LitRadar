@@ -28,6 +28,7 @@ export interface PaperItem {
 
 export interface PaperDetail extends PaperItem {
   journalName: string | null;
+  fetchedAt: string | null;
 }
 
 export interface FavoriteItem {
@@ -70,6 +71,23 @@ export interface DashboardStats {
   checklistTodoCount: number;
   checklistDoneCount: number;
   noteCount: number;
+}
+
+export interface OverviewRun {
+  id: string;
+  sourceName: string | null;
+  status: string;
+  startedAt: string;
+  insertedCount: number;
+  updatedCount: number;
+}
+
+export interface Overview {
+  stats: DashboardStats;
+  newThisWeek: number;
+  failedRuns: number;
+  recentPapers: PaperDetail[];
+  recentRuns: OverviewRun[];
 }
 
 export interface PaginatedResponse<T> {

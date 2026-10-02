@@ -5,8 +5,8 @@ import { ErrorBoundary } from 'react-error-boundary';
 
 import RoutesComponent from './app.tsx';
 import './index.css';
-import { Toaster } from '@client/src/components/ui/sonner';
-import { AuthProvider } from '@client/src/contexts/AuthContext';
+import { Toaster } from '@/components/ui/sonner';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { createPortal } from 'react-dom';
 
 const MainApp = () => {

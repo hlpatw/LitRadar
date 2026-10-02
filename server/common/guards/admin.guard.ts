@@ -5,6 +5,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../modules/auth/auth.guard';
+import { isAdminEmail } from '../utils/admin.util';
 
 /**
  * Guard for expensive / write operations (connector pulls).
@@ -31,11 +32,7 @@ export class AdminOrCliGuard extends JwtAuthGuard implements CanActivate {
     // (a) JWT path: require a valid login AND an admin email.
     await super.canActivate(context);
     const user = req.user as { email?: string } | undefined;
-    const adminEmails = (process.env.ADMIN_EMAILS || '')
-      .split(',')
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean);
-    if (!user?.email || !adminEmails.includes(user.email.toLowerCase())) {
+    if (!isAdminEmail(user?.email)) {
       throw new ForbiddenException('admin privileges required');
     }
     return true;

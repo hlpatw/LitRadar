@@ -55,6 +55,12 @@ const Papers: React.FC = () => {
 
   const journalId: string = searchParams.get('journalId') || '';
   const search: string = searchParams.get('search') || '';
+  const from: string = searchParams.get('from') || '';
+  const to: string = searchParams.get('to') || '';
+  const priority: string = searchParams.get('priority') || '';
+  const hasAbstract: string = searchParams.get('hasAbstract') || '';
+  const favorite: string = searchParams.get('favorite') || '';
+  const todo: string = searchParams.get('todo') || '';
   const page: number = parseInt(searchParams.get('page') || '1', 10);
 
   const [searchInput, setSearchInput] = React.useState<string>(search);
@@ -104,6 +110,12 @@ const Papers: React.FC = () => {
       .getPapers({
         journalId: journalId || undefined,
         search: search || undefined,
+        from: from || undefined,
+        to: to || undefined,
+        priority: priority || undefined,
+        hasAbstract: hasAbstract || undefined,
+        favorite: favorite || undefined,
+        todo: todo || undefined,
         page,
         pageSize: PAGE_SIZE,
       })
@@ -116,7 +128,7 @@ const Papers: React.FC = () => {
         setError('加载论文列表失败，请稍后重试');
         setLoading(false);
       });
-  }, [journalId, search, page]);
+  }, [journalId, search, page, from, to, priority, hasAbstract, favorite, todo]);
 
   const updateParams = (updates: Record<string, string>): void => {
     const next: URLSearchParams = new URLSearchParams(searchParams);
@@ -215,8 +227,7 @@ const Papers: React.FC = () => {
               <Plus className="size-4" />
               创建论文
             </Button>
-          </DialogTrigger>
-          <DialogContent className="max-h-[80vh] max-w-2xl overflow-auto">
+          </DialogTrigger>          <DialogContent className="max-h-[80vh] max-w-2xl overflow-auto">
             <DialogHeader>
               <DialogTitle className="font-serif text-2xl">
                 创建论文
@@ -397,6 +408,60 @@ const Papers: React.FC = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3 rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-3">
+        <Input
+          type="date"
+          value={from}
+          onChange={(e) => updateParams({ from: e.target.value })}
+          className="w-[160px]"
+          aria-label="起始日期"
+        />
+        <span className="text-[var(--muted-foreground)]">至</span>
+        <Input
+          type="date"
+          value={to}
+          onChange={(e) => updateParams({ to: e.target.value })}
+          className="w-[160px]"
+          aria-label="结束日期"
+        />
+        <Select value={priority || 'all'} onValueChange={(v) => updateParams({ priority: v === 'all' ? '' : v })}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="优先级" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部优先级</SelectItem>
+            <SelectItem value="P0">P0</SelectItem>
+            <SelectItem value="P1">P1</SelectItem>
+            <SelectItem value="P2">P2</SelectItem>
+            <SelectItem value="P3">P3</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={hasAbstract || 'all'} onValueChange={(v) => updateParams({ hasAbstract: v === 'all' ? '' : v })}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="摘要" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部</SelectItem>
+            <SelectItem value="1">有摘要</SelectItem>
+            <SelectItem value="0">无摘要</SelectItem>
+          </SelectContent>
+        </Select>
+        <button
+          type="button"
+          onClick={() => updateParams({ favorite: favorite ? '' : '1' })}
+          className={`rounded-md border px-3 py-1.5 text-sm ${favorite ? 'border-[var(--primary)] bg-[var(--primary)] text-white' : 'border-[var(--border)]'}`}
+        >
+          仅收藏
+        </button>
+        <button
+          type="button"
+          onClick={() => updateParams({ todo: todo ? '' : '1' })}
+          className={`rounded-md border px-3 py-1.5 text-sm ${todo ? 'border-[var(--primary)] bg-[var(--primary)] text-white' : 'border-[var(--border)]'}`}
+        >
+          仅待读
+        </button>
       </div>
 
       <div className="mt-10 space-y-3">

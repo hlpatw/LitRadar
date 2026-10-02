@@ -13,7 +13,7 @@ import Notes from './pages/Notes/Notes';
 import Settings from './pages/Settings/Settings';
 import LoginPage from './pages/Login/LoginPage';
 import RegisterPage from './pages/Register/RegisterPage';
-import { useAuth } from './contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 function ProtectedLayout() {
   const { user, loading } = useAuth();

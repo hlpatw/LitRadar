@@ -15,8 +15,9 @@ import {
   userSettings,
   papers,
   journals,
+  sourceSyncRuns,
 } from '../../database/schema';
-import { eq, and, asc, desc, count } from 'drizzle-orm';
+import { eq, and, asc, desc, count, gte, sql } from 'drizzle-orm';
 import type {
   DashboardStats,
   FavoriteItem,
@@ -29,6 +30,9 @@ import type {
   UpdateNoteRequest,
   UpdateSettingsRequest,
   PaperItem,
+  PaperDetail,
+  Overview,
+  OverviewRun,
 } from '@shared/api.interface';
 
 function mapPaper(p: typeof papers.$inferSelect): PaperItem {
@@ -102,6 +106,58 @@ export class WorkspaceService {
       checklistTodoCount: todoResult[0].count,
       checklistDoneCount: doneResult[0].count,
       noteCount: noteResult[0].count,
+    };
+  }
+
+  async getOverview(userId: string): Promise<Overview> {
+    const stats = await this.getDashboard(userId);
+
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const [weekRes] = await this.db
+      .select({ n: count() })
+      .from(papers)
+      .where(gte(papers.createdAt, weekAgo));
+
+    const [failedRes] = await this.db
+      .select({ n: count() })
+      .from(sourceSyncRuns)
+      .where(sql`${sourceSyncRuns.status} = 'failed'`);
+
+    const recentRows = await this.db
+      .select({ p: papers, jName: journals.name })
+      .from(papers)
+      .leftJoin(journals, eq(papers.journalId, journals.id))
+      .orderBy(desc(papers.createdAt))
+      .limit(8);
+    const recentPapers: PaperDetail[] = recentRows.map(
+      (r): PaperDetail => ({
+        ...mapPaper(r.p),
+        journalName: r.jName ?? null,
+        fetchedAt: r.p.fetchedAt ? r.p.fetchedAt.toISOString() : null,
+      }),
+    );
+
+    const runRows = await this.db
+      .select({ r: sourceSyncRuns, jName: journals.name })
+      .from(sourceSyncRuns)
+      .leftJoin(journals, eq(sourceSyncRuns.sourceId, journals.id))
+      .orderBy(desc(sourceSyncRuns.startedAt))
+      .limit(8);
+    const recentRuns: OverviewRun[] = runRows.map((r) => ({
+      id: r.r.id,
+      sourceName: r.jName ?? null,
+      status: r.r.status,
+      startedAt: r.r.startedAt.toISOString(),
+      insertedCount: r.r.insertedCount,
+      updatedCount: r.r.updatedCount,
+    }));
+
+    return {
+      stats,
+      newThisWeek: weekRes?.n ?? 0,
+      failedRuns: failedRes?.n ?? 0,
+      recentPapers,
+      recentRuns,
     };
   }
 

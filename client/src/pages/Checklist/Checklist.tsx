@@ -7,8 +7,8 @@ import {
   BookOpenIcon,
 } from 'lucide-react';
 
-import { Button } from '@client/src/components/ui/button';
-import { Input } from '@client/src/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from '@client/src/components/ui/dialog';
+} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -27,18 +27,18 @@ import {
   AlertDialogFooter,
   AlertDialogAction,
   AlertDialogCancel,
-} from '@client/src/components/ui/alert-dialog';
+} from '@/components/ui/alert-dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@client/src/components/ui/select';
-import { Badge } from '@client/src/components/ui/badge';
-import { Spinner } from '@client/src/components/ui/spinner';
-import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@client/src/components/ui/empty';
-import { workspace, papers as papersApi } from '@client/src/api';
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Spinner } from '@/components/ui/spinner';
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import { workspace, papers as papersApi } from '@/api';
 import type { ChecklistItem, PaperItem, CreateChecklistRequest, UpdateChecklistRequest } from '@shared/api.interface';
 
 const STATUS_LABELS: Record<ChecklistItem['status'], string> = {

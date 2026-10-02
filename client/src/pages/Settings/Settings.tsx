@@ -2,12 +2,12 @@ import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import { toast } from 'sonner';
 import { SettingsIcon } from 'lucide-react';
 
-import { Button } from '@client/src/components/ui/button';
-import { Input } from '@client/src/components/ui/input';
-import { Textarea } from '@client/src/components/ui/textarea';
-import { Spinner } from '@client/src/components/ui/spinner';
-import { workspace } from '@client/src/api';
-import api from '@client/src/utils/axios';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Spinner } from '@/components/ui/spinner';
+import { workspace } from '@/api';
+import api from '@/utils/axios';
 import type { UserSettings, UpdateSettingsRequest } from '@shared/api.interface';
 
 interface VersionInfo {

@@ -5,6 +5,9 @@ import { eq } from 'drizzle-orm';
 import * as bcrypt from 'bcryptjs';
 import { DATABASE, type Database } from '../../database/database.module';
 import { users } from '../../database/schema';
+import { isAdminEmail } from '../../common/utils/admin.util';
+
+type SafeUser = { id: string; username: string; email: string; displayName: string | null; isAdmin: boolean };
 
 @Injectable()
 export class AuthService {
@@ -12,6 +15,16 @@ export class AuthService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly jwtService: JwtService,
   ) {}
+
+  private shape(u: { id: string; username: string; email: string; displayName: string | null }): SafeUser {
+    return {
+      id: u.id,
+      username: u.username,
+      email: u.email,
+      displayName: u.displayName,
+      isAdmin: isAdminEmail(u.email),
+    };
+  }
 
   async register(dto: { username: string; email: string; password: string; displayName?: string }) {
     const existing = await this.db
@@ -34,7 +47,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
-    const [user] = await this.db
+    const [row] = await this.db
       .insert(users)
       .values({
         username: dto.username,
@@ -42,8 +55,9 @@ export class AuthService {
         passwordHash,
         displayName: dto.displayName ?? dto.username,
       })
-      .returning({ id: users.id, username: users.username, email: users.email });
+      .returning({ id: users.id, username: users.username, email: users.email, displayName: users.displayName });
 
+    const user = this.shape(row);
     const token = this.jwtService.sign({ sub: user.id, username: user.username, email: user.email });
     return { user, token };
   }
@@ -65,21 +79,21 @@ export class AuthService {
 
     const token = this.jwtService.sign({ sub: user.id, username: user.username, email: user.email });
     return {
-      user: { id: user.id, username: user.username, email: user.email, displayName: user.displayName },
+      user: this.shape(user),
       token,
     };
   }
 
   async getProfile(userId: string) {
-    const [user] = await this.db
+    const [row] = await this.db
       .select({ id: users.id, username: users.username, email: users.email, displayName: users.displayName })
       .from(users)
       .where(eq(users.id, userId));
 
-    if (!user) {
+    if (!row) {
       throw new UnauthorizedException('用户不存在');
     }
 
-    return user;
+    return this.shape(row);
   }
 }

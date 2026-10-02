@@ -27,16 +27,43 @@ import type {
 export class PapersController {
   constructor(private readonly papersService: PapersService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Get()
   async list(
+    @Req() req: Request,
     @Query('journalId') journalId?: string,
     @Query('search') search?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('priority') priority?: string,
+    @Query('hasAbstract') hasAbstract?: string,
+    @Query('favorite') favorite?: string,
+    @Query('todo') todo?: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe)
     page?: number,
     @Query('pageSize', new DefaultValuePipe(20), ParseIntPipe)
     pageSize?: number,
   ): Promise<PaginatedResponse<PaperItem>> {
-    return this.papersService.list(journalId, search, page, pageSize);
+    const { userId } = req.user as { userId: string };
+    const truthy = (v?: string) => v === '1' || v === 'true';
+    const hasAbs = hasAbstract === undefined
+      ? undefined
+      : truthy(hasAbstract);
+    return this.papersService.list(
+      {
+        journalId,
+        search,
+        from,
+        to,
+        priority,
+        hasAbstract: hasAbs,
+        favorite: truthy(favorite) ? true : undefined,
+        todo: truthy(todo) ? true : undefined,
+      },
+      userId,
+      page,
+      pageSize,
+    );
   }
 
   @Get(':id')

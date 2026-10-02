@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getSources, type SourceRow } from '../../api/sources';
 import { syncSource, syncAllReady, getSyncRuns, type SyncRunRow } from '../../api/connectors';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 const priorityColor: Record<string, string> = {
   P0: 'bg-red-100 text-red-700',
@@ -29,6 +30,8 @@ export default function Sources() {
   const [error, setError] = useState<string | null>(null);
   const [syncingIssn, setSyncingIssn] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
+  const { user } = useAuth();
+  const isAdmin = !!user?.isAdmin;
 
   const load = useCallback(() => {
     return Promise.all([
@@ -83,13 +86,15 @@ export default function Sources() {
             共 {rows.length} 个 · 已就绪连接器 {ready} · 骨架/未实现 {rows.length - ready}
           </span>
         </div>
-        <button
-          onClick={handleSyncAll}
-          disabled={syncingAll}
-          className="rounded-md bg-[var(--primary)] px-3 py-1.5 text-sm text-white disabled:opacity-50"
-        >
-          {syncingAll ? '同步中…' : '手动同步全部'}
-        </button>
+        {isAdmin && (
+          <button
+            onClick={handleSyncAll}
+            disabled={syncingAll}
+            className="rounded-md bg-[var(--primary)] px-3 py-1.5 text-sm text-white disabled:opacity-50"
+          >
+            {syncingAll ? '同步中…' : '手动同步全部'}
+          </button>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
@@ -140,7 +145,7 @@ export default function Sources() {
                   {r.lastRunStatus ? ` (${r.lastRunStatus})` : ''}
                 </td>
                 <td className="px-3 py-2">
-                  {r.connectorStatus === 'ready' && r.issn ? (
+                  {isAdmin && r.connectorStatus === 'ready' && r.issn ? (
                     <button
                       onClick={() => handleSyncOne(r.issn!)}
                       disabled={syncingIssn === r.issn}

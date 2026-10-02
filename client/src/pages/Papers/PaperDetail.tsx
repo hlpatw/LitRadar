@@ -1,12 +1,13 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Star, Pencil, Trash2 } from 'lucide-react';
+import { ChevronLeft, Star, Pencil, Trash2, CheckSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '../../utils/logger';
 import { papers, workspace } from '@/api';
 import type {
   PaperDetail as PaperDetailType,
   FavoriteItem,
+  ChecklistItem,
   UpdatePaperRequest,
 } from '@shared/api.interface';
 import { Button } from '@/components/ui/button';
@@ -42,9 +43,13 @@ const PaperDetailPage: React.FC = () => {
 
   const [paper, setPaper] = React.useState<PaperDetailType | null>(null);
   const [favorites, setFavorites] = React.useState<FavoriteItem[]>([]);
+  const [inChecklist, setInChecklist] = React.useState<boolean>(false);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
   const [togglingFav, setTogglingFav] = React.useState<boolean>(false);
+  const [togglingTodo, setTogglingTodo] = React.useState<boolean>(false);
+  const [noteDraft, setNoteDraft] = React.useState<string>('');
+  const [savingNote, setSavingNote] = React.useState<boolean>(false);
 
   // Edit dialog
   const [editOpen, setEditOpen] = React.useState<boolean>(false);
@@ -64,11 +69,20 @@ const PaperDetailPage: React.FC = () => {
     if (!id) return;
     setLoading(true);
     setError(null);
-    Promise.all([papers.getPaperDetail(id), workspace.getFavorites()])
+    Promise.all([
+      papers.getPaperDetail(id),
+      workspace.getFavorites(),
+      workspace.getChecklist(),
+    ])
       .then(
-        ([paperData, favs]: [PaperDetailType, FavoriteItem[]]) => {
+        ([paperData, favs, checklist]: [
+          PaperDetailType,
+          FavoriteItem[],
+          ChecklistItem[],
+        ]) => {
           setPaper(paperData);
           setFavorites(favs);
+          setInChecklist(checklist.some((c) => c.paperId === id));
           setLoading(false);
         },
       )
@@ -104,6 +118,40 @@ const PaperDetailPage: React.FC = () => {
       toast.error(isFav ? '取消收藏失败' : '收藏失败');
     } finally {
       setTogglingFav(false);
+    }
+  };
+
+  const toggleChecklist = async (): Promise<void> => {
+    if (!paper) return;
+    setTogglingTodo(true);
+    try {
+      if (inChecklist) {
+        toast.info('请在待读列表页移除该论文');
+      } else {
+        await workspace.createChecklistItem({ paperId: paper.id, status: 'todo' });
+        setInChecklist(true);
+        toast.success('已加入待读');
+      }
+    } catch (err: unknown) {
+      logger.error('更新待读失败', err);
+      toast.error('操作失败');
+    } finally {
+      setTogglingTodo(false);
+    }
+  };
+
+  const saveNote = async (): Promise<void> => {
+    if (!paper || !noteDraft.trim()) return;
+    setSavingNote(true);
+    try {
+      await workspace.createNote({ paperId: paper.id, content: noteDraft.trim() });
+      setNoteDraft('');
+      toast.success('笔记已保存');
+    } catch (err: unknown) {
+      logger.error('保存笔记失败', err);
+      toast.error('保存笔记失败');
+    } finally {
+      setSavingNote(false);
     }
   };
 
@@ -236,8 +284,23 @@ const PaperDetailPage: React.FC = () => {
         )}
         {paper.publishedDate && (
           <span className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--muted-foreground)]">
-            {new Date(paper.publishedDate).toLocaleDateString('zh-CN')}
+            发表 {new Date(paper.publishedDate).toLocaleDateString('zh-CN')}
           </span>
+        )}
+        {paper.fetchedAt && (
+          <span className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--muted-foreground)]">
+            抓取 {new Date(paper.fetchedAt).toLocaleString('zh-CN')}
+          </span>
+        )}
+        {paper.url && (
+          <a
+            href={paper.url}
+            target="_blank"
+            rel="noreferrer"
+            className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--primary)] underline"
+          >
+            原文链接 ↗
+          </a>
         )}
       </div>
 
@@ -317,6 +380,15 @@ const PaperDetailPage: React.FC = () => {
           {isFav ? '已收藏' : '收藏'}
         </Button>
         <Button
+          onClick={toggleChecklist}
+          disabled={togglingTodo || inChecklist}
+          variant="outline"
+          className="rounded-[8px]"
+        >
+          {togglingTodo ? <Spinner className="size-4" /> : <CheckSquare className="size-4" />}
+          {inChecklist ? '已在待读' : '加入待读'}
+        </Button>
+        <Button
           onClick={openEditDialog}
           variant="outline"
           className="rounded-[8px]"
@@ -349,6 +421,28 @@ const PaperDetailPage: React.FC = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+      </div>
+
+      {/* Quick note on this paper */}
+      <div className="mt-10 rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-[22px_24px]">
+        <h2 className="font-serif text-[24px] font-bold leading-[1.4] tracking-[-0.005em] max-sm:text-[20px]">
+          笔记
+        </h2>
+        <Textarea
+          value={noteDraft}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+            setNoteDraft(e.target.value)
+          }
+          rows={3}
+          placeholder="记录对这篇论文的想法…"
+          className="mt-3"
+        />
+        <div className="mt-3">
+          <Button onClick={saveNote} disabled={savingNote || !noteDraft.trim()} className="rounded-[8px]">
+            {savingNote ? <Spinner className="size-4" /> : null}
+            保存笔记
+          </Button>
+        </div>
       </div>
 
       {/* Edit Dialog */}

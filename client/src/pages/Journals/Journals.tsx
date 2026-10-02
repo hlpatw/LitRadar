@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import type { JournalItem } from '@shared/api.interface';
-import { journals } from '@client/src/api';
-import { Skeleton } from '@client/src/components/ui/skeleton';
+import { journals } from '@/api';
+import { Skeleton } from '@/components/ui/skeleton';
 import { BookOpen } from 'lucide-react';
 import { Link as UniversalLink } from 'react-router-dom';
 

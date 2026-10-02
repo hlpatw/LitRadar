@@ -15,5 +15,5 @@ test('workspace controller uses the shared authenticated user helper for every h
   const source = readFileSync(controllerPath, 'utf8');
 
   assert.equal(source.includes('const { userId } = (req as any).user.userId'), false);
-  assert.equal((source.match(/const userId = getAuthenticatedUserId\(req\);/g) ?? []).length, 14);
+  assert.equal((source.match(/const userId = getAuthenticatedUserId\(req\);/g) ?? []).length, 15);
 });
