@@ -74,7 +74,11 @@ export class RadarService {
       .limit(1);
     if (existing) return this.toSnapshot(existing, false);
 
-    const wsNext = weekStartKey(addWeeks(weekStart, 1));
+    // Real UTC instants for the week boundaries: Mon 00:00 CST == Sun 16:00 UTC.
+    // Comparing timestamptz against these (NOT ::date) avoids an 8h off-by-one from the
+    // session timezone. Same anchor drives new_score and newPaperCount.
+    const wsInstant = weekStart.toISOString();
+    const wsNextInstant = addWeeks(weekStart, 1).toISOString();
 
     // Scoring CTE. No LLM / network. Tie-breaks fully deterministic.
     const result = await this.db.execute(sql`
@@ -83,7 +87,7 @@ export class RadarService {
       ),
       cand AS (
         SELECT
-          p.id, p.title, p.abstract_text, p.keywords, p.published_date, p.fetched_at,
+          p.id, p.title, p.abstract_text, p.keywords, p.published_date, p.fetched_at, p.url,
           j.name AS journal_name, j.priority AS source_priority,
           lower(coalesce(p.title,'') || ' ' || coalesce(p.abstract_text,'') || ' ' || coalesce(p.keywords,'')) AS ctext
         FROM papers p LEFT JOIN ready j ON j.id = p.journal_id
@@ -108,7 +112,7 @@ export class RadarService {
         SELECT matched.*,
           CASE source_priority WHEN 'P0' THEN 1.0 WHEN 'P1' THEN 0.75 WHEN 'P2' THEN 0.5 WHEN 'P3' THEN 0.25 ELSE 0.3 END AS source_score,
           CASE WHEN abstract_text IS NOT NULL AND abstract_text <> '' THEN 1.0 ELSE 0.0 END AS abstract_score,
-          CASE WHEN fetched_at >= ${ws}::date AND fetched_at < ${wsNext}::date THEN 1.0 ELSE 0.0 END AS new_score,
+          CASE WHEN fetched_at >= ${wsInstant}::timestamptz AND fetched_at < ${wsNextInstant}::timestamptz THEN 1.0 ELSE 0.0 END AS new_score,
           LEAST(1.0, coalesce(array_length(matched.hot_terms,1),0)::numeric / 3.0) AS keyword_score,
           COALESCE(published_date, fetched_at::date) AS recency
         FROM matched
@@ -146,7 +150,7 @@ export class RadarService {
           title: r.title,
           journalName: r.journal_name,
           publishedDate: r.published_date ? String(r.published_date).slice(0, 10) : null,
-          url: null,
+          url: r.url ?? null,
           hasAbstract: Number(r.abstract_score) > 0,
         },
         score: Number(Number(r.total_score).toFixed(4)),
@@ -158,7 +162,7 @@ export class RadarService {
     const [newCountRow] = await this.db
       .select({ n: sql<number>`count(*)::int` })
       .from(papers)
-      .where(sql`${papers.fetchedAt} >= ${ws}::date AND ${papers.fetchedAt} < ${wsNext}::date`);
+      .where(sql`${papers.fetchedAt} >= ${wsInstant}::timestamptz AND ${papers.fetchedAt} < ${wsNextInstant}::timestamptz`);
 
     const sourceDistribution = [...srcDist.entries()]
       .map(([source, count]) => ({ source, count }))

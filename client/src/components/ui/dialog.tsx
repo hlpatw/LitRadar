@@ -86,11 +86,16 @@ function DialogContent({
 
 // Scrollable modal region: place long form content here. The header above and footer
 // below remain fixed; this middle block scrolls on its own (internal scrolling).
+// min-w-0 + overflow-wrap:anywhere + break-words guarantee long titles, paper-select
+// values, error text, tags and URLs wrap instead of overflowing at 375px / 1280 / 200%.
 function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-body"
-      className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1", className)}
+      className={cn(
+        "min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pr-1 [overflow-wrap:anywhere] [word-break:break-word]",
+        className
+      )}
       {...props}
     />
   )

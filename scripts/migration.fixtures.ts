@@ -28,6 +28,8 @@ const migDir = join(root, 'server', 'database', 'migrations');
 const f = (p: string) => readFileSync(p, 'utf8');
 const UP = ['0000_base.up.sql', '0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql'];
 const DOWN = ['0004_correct_issn.down.sql', '0003_full_catalog.down.sql', '0002_reconcile.down.sql', '0001_sources.down.sql', '0000_base.down.sql'];
+// Full chain through 0008 for the forward-only migration round-trip test.
+const UP_THROUGH_0008 = [...UP, '0005_user_library.up.sql', '0006_source_detail_indexes.up.sql', '0007_source_running_ux.up.sql', '0008_radar_events_scheduler.up.sql'];
 
 const dataDir = mkdtempSync(join(tmpdir(), 'litradar-migfix-'));
 
@@ -209,6 +211,63 @@ async function scenarioProduction64(client: Client) {
   console.log('[ok] C) down/re-up cycle: legacy rows survive, re-up clean');
 }
 
+// D) Migration 0008 round-trip: up x2 idempotent, then down, then re-up.
+//    user_notes.tags values must SURVIVE down (down must not DROP the column),
+//    while behavior_events / weekly_radar_snapshots / scheduler_state are dropped on down
+//    and restored on re-up.
+async function scenarioRadarEventsScheduler(client: Client) {
+  await resetDb(client);
+  for (const u of UP_THROUGH_0008) await client.query(f(join(migDir, u)));
+  for (const u of UP_THROUGH_0008) await client.query(f(join(migDir, u)));
+
+  const q = async (s: string) => (await client.query(s)).rows;
+  const tableExists = async (t: string) =>
+    Number((await q(`SELECT COUNT(*) c FROM information_schema.tables WHERE table_name='${t}'`))[0].c) === 1;
+  const colExists = async (t: string, c: string) =>
+    Number((await q(`SELECT COUNT(*) c FROM information_schema.columns WHERE table_name='${t}' AND column_name='${c}'`))[0].c) === 1;
+
+  for (const t of ['weekly_radar_snapshots', 'behavior_events', 'scheduler_state']) {
+    if (!(await tableExists(t))) throw new Error(`[0008] ${t} missing after up`);
+  }
+  if (!(await colExists('user_notes', 'tags'))) throw new Error('[0008] user_notes.tags column missing after up');
+
+  await client.query(`INSERT INTO users (id,username,email,password_hash) VALUES ('00000000-0000-4000-8000-000000000aa1','tuser','t@x.io','x')`);
+  await client.query(`INSERT INTO papers (id,title,fetched_at) VALUES ('00000000-0000-4000-8000-000000000001','P1',now())`);
+  await client.query(
+    `INSERT INTO user_notes (id,user_id,paper_id,content,tags) VALUES ('00000000-0000-4000-8000-000000000bb1','00000000-0000-4000-8000-000000000aa1','00000000-0000-4000-8000-000000000001','note body', ARRAY['priming','syntax']::text[])`,
+  );
+  await client.query(
+    `INSERT INTO behavior_events (user_id,event_type,paper_id,idempotency_key) VALUES ('00000000-0000-4000-8000-000000000aa1','impression','00000000-0000-4000-8000-000000000001','k1')`,
+  );
+  await client.query(
+    `INSERT INTO weekly_radar_snapshots (week_start,new_paper_count,top10,source_distribution,keyword_hits) VALUES ('2026-09-28',1,'[]'::jsonb,'[]'::jsonb,'[]'::jsonb)`,
+  );
+
+  await client.query(f(join(migDir, '0008_radar_events_scheduler.down.sql')));
+
+  for (const t of ['weekly_radar_snapshots', 'behavior_events', 'scheduler_state']) {
+    if (await tableExists(t)) throw new Error(`[0008] ${t} still present after down`);
+  }
+  if (!(await colExists('user_notes', 'tags'))) throw new Error('[0008] user_notes.tags DROPPED on down (data loss!)');
+  const noteRow = (await q(`SELECT tags FROM user_notes WHERE id='00000000-0000-4000-8000-000000000bb1'`))[0];
+  const keptTags = noteRow?.tags ?? [];
+  if (!keptTags.includes('priming') || !keptTags.includes('syntax')) {
+    throw new Error(`[0008] user_notes.tags value lost on down: ${JSON.stringify(keptTags)}`);
+  }
+  console.log('[ok] D) 0008 down: events/snapshots/scheduler dropped; user_notes.tags column+values preserved');
+
+  await client.query(f(join(migDir, '0008_radar_events_scheduler.up.sql')));
+  for (const t of ['weekly_radar_snapshots', 'behavior_events', 'scheduler_state']) {
+    if (!(await tableExists(t))) throw new Error(`[0008] ${t} missing after re-up`);
+  }
+  const after = (await q(`SELECT tags FROM user_notes WHERE id='00000000-0000-4000-8000-000000000bb1'`))[0];
+  const afterTags = after?.tags ?? [];
+  if (!afterTags.includes('priming') || !afterTags.includes('syntax')) {
+    throw new Error(`[0008] user_notes.tags value lost after re-up: ${JSON.stringify(afterTags)}`);
+  }
+  console.log('[ok] D) 0008 re-up: tables restored; note tags intact');
+}
+
 async function main() {
   const pgPort = await freePort();
   const pg = new EmbeddedPostgres({ databaseDir: dataDir, user: 'postgres', password: 'postgres', port: pgPort });
@@ -220,6 +279,7 @@ async function main() {
     await scenarioEmpty(client);
     await scenarioLegacy38(client);
     await scenarioProduction64(client);
+    await scenarioRadarEventsScheduler(client);
     console.log('\n=== MIGRATION FIXTURE SUITE PASSED ===');
   } finally {
     await client.end();
