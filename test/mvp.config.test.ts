@@ -28,7 +28,7 @@ test('exactly 7 Crossref-ready journals, exact ISSN list', () => {
   assert.equal(CROSSREF_READY_ISSNS.length, 7);
   assert.deepEqual(
     CROSSREF_READY_ISSNS.slice().sort(),
-    ['0010-0277', '0142-7164', '0142-7237', '0305-0009', '0749-596X', '1048-6928', '1366-7289'],
+    ['0010-0277', '0142-7164', '0142-7237', '0305-0009', '0749-596X', '1048-9223', '1366-7289'],
   );
 });
 

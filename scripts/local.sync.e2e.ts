@@ -32,7 +32,7 @@ async function main() {
   const boot = new Client({ connectionString: conn });
   await boot.connect();
   await boot.query(f(join(root, 'deploy', 'migration.sql')));
-  for (const m of ['0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql']) {
+  for (const m of ['0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql']) {
     await boot.query(f(join(migDir, m)));
   }
   await boot.end();
@@ -111,14 +111,22 @@ async function main() {
   console.log('[ok] non-admin sync-all ->', gate.status, '(expect 403); non-admin isAdmin =', reg2.data.user?.isAdmin);
 
   console.log('\n==============================================');
-  console.log(`SERVER UP at http://127.0.0.1:${PORT}`);
-  console.log(`admin login -> username: ${uname}  password: password123`);
-  console.log(`plain login -> username: ${uname2}  password: password123`);
-  console.log('Leaving server running for browser E2E...');
+  // Default: exit cleanly after reporting (so this never hangs CI).
+  // Set SERVE=1 to keep the server up for a manual browser E2E.
+  if (process.env.SERVE === '1') {
+    console.log(`SERVER UP at http://127.0.0.1:${PORT}`);
+    console.log(`admin login -> username: ${uname}  password: password123`);
+    console.log(`plain login -> username: ${uname2}  password: password123`);
+    console.log('SERVE=1 -> keeping server up for browser E2E.');
+  } else {
+    console.log('Done. Exiting cleanly (set SERVE=1 to keep serving for browser E2E).');
+  }
   console.log('==============================================');
-
-  // Keep alive.
-  await new Promise(() => {});
+  if (process.env.SERVE === '1') {
+    await new Promise(() => {});
+  }
+  await app.close();
+  await pg.stop();
 }
 
 main().catch((e) => { console.error('LOCAL SYNC E2E FAILED:', e); process.exit(1); });

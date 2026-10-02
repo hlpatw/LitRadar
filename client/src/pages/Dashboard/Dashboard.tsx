@@ -164,7 +164,7 @@ const Dashboard: React.FC = () => {
                   <tr key={r.id} className="border-b border-[var(--border)] last:border-0">
                     <td className="py-2 pr-3">{r.sourceName || '—'}</td>
                     <td className="py-2 pr-3">
-                      <span className={r.status === 'failed' ? 'text-red-600' : r.status === 'ok' ? 'text-green-600' : ''}>
+                      <span className={r.status === 'error' ? 'text-red-600' : r.status === 'ok' ? 'text-green-600' : ''}>
                         {r.status}
                       </span>
                     </td>

@@ -1,5 +1,6 @@
 import { Injectable, Inject, Optional } from '@nestjs/common';
 import { CrossrefWork, mapCrossrefWork, MappedPaper } from './crossref.mapper';
+import { fetchWithRetry } from './retry.util';
 
 export interface CrossrefFetchResult {
   items: MappedPaper[];
@@ -9,6 +10,7 @@ export interface CrossrefFetchResult {
 // Injectable fetch so tests can supply a stub without network.
 export type FetchFn = (url: string, init?: Record<string, unknown>) => Promise<{
   status: number;
+  headers?: Record<string, string | string[] | undefined>;
   json: () => Promise<unknown>;
 }>;
 
@@ -29,6 +31,10 @@ export class CrossrefConnector {
    * Fetch the most recent works for a journal ISSN, newest first. Real network call.
    * `since` (ISO date) enables an incremental pull: only works published on/after it
    * are requested (Crossref from-pub-date filter), so repeat runs fetch only deltas.
+   *
+   * Transient failures (HTTP 429 / 5xx / network timeout) are retried with a limited
+   * exponential backoff that honours the Retry-After header. Permanent failures
+   * (e.g. 404 unknown ISSN) are NOT retried and surface immediately.
    */
   async fetchRecent(issn: string, rows = 25, since?: string): Promise<CrossrefFetchResult> {
     const params = new URLSearchParams({
@@ -43,10 +49,9 @@ export class CrossrefConnector {
     }
     const url = `${this.base}/journals/${encodeURIComponent(issn)}/works?${params.toString()}`;
 
-    const res = await this.fetchFn(url, { headers: { 'User-Agent': `LitRadar/1.0 (${this.mailto})` } });
-    if (res.status >= 400) {
-      throw new Error(`Crossref request failed: HTTP ${res.status}`);
-    }
+    const res = await fetchWithRetry(url, (u, init) =>
+      this.fetchFn(u, { headers: { 'User-Agent': `LitRadar/1.0 (${this.mailto})` }, ...init }),
+    );
     const body = (await res.json()) as {
       message?: { 'total-results'?: number; items?: CrossrefWork[] };
     };

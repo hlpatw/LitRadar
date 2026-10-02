@@ -28,7 +28,7 @@ INSERT INTO _catalog VALUES
   ('BUCLD','conference','P0',NULL,'https://www.bu.edu/bucld/','html','skeleton','monthly'),
   ('IASCL Congress','conference','P0',NULL,'https://www.childlanguage.org/our-next-congress','html','skeleton','monthly'),
   ('Bilingualism: Language and Cognition','journal','P1','1366-7289','https://www.cambridge.org/core/journals/bilingualism-language-and-cognition','crossref','ready','biweekly'),
-  ('Language Acquisition','journal','P1','1048-6928','https://www.tandfonline.com/journals/hlac20','crossref','ready','biweekly'),
+  ('Language Acquisition','journal','P1','1048-9223','https://www.tandfonline.com/journals/hlac20','crossref','ready','biweekly'),
   ('Language Learning','journal','P1','0023-8333','https://onlinelibrary.wiley.com/journal/14679922','crossref','ready','biweekly'),
   ('Studies in Second Language Acquisition','journal','P1','0272-2631','https://www.cambridge.org/core/journals/studies-in-second-language-acquisition','crossref','ready','biweekly'),
   ('Second Language Research','journal','P1','0267-6583','https://journals.sagepub.com/home/slr','crossref','ready','biweekly'),
@@ -86,4 +86,4 @@ WHERE status = 'active'
 -- UI does not mislead. Excel 38 combined rows -> 40 entities after venue splits.
 UPDATE journals SET connector_status='skeleton';
 UPDATE journals SET connector_status='ready'
-WHERE issn IN ('0749-596X','0010-0277','0305-0009','0142-7237','0142-7164','1048-6928','1366-7289');
+WHERE issn IN ('0749-596X','0010-0277','0305-0009','0142-7237','0142-7164','1048-9223','1366-7289');

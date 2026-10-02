@@ -23,8 +23,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const migDir = join(root, 'server', 'database', 'migrations');
 const f = (p: string) => readFileSync(p, 'utf8');
-const UP = ['0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql'];
-const DOWN = ['0003_full_catalog.down.sql', '0002_reconcile.down.sql', '0001_sources.down.sql'];
+const UP = ['0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql'];
+const DOWN = ['0004_correct_issn.down.sql', '0003_full_catalog.down.sql', '0002_reconcile.down.sql', '0001_sources.down.sql'];
 
 const dataDir = mkdtempSync(join(tmpdir(), 'litradar-migfix-'));
 

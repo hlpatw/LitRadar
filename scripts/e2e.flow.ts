@@ -30,7 +30,7 @@ async function main() {
   const boot = new Client({ connectionString: conn });
   await boot.connect();
   await boot.query(f(join(root, 'deploy', 'migration.sql')));
-  for (const m of ['0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql']) {
+  for (const m of ['0001_sources.up.sql', '0002_reconcile.up.sql', '0003_full_catalog.up.sql', '0004_correct_issn.up.sql']) {
     await boot.query(f(join(migDir, m)));
   }
   await boot.end();
@@ -87,10 +87,13 @@ async function main() {
     if (ready !== 7) throw new Error('expected 7 ready, got ' + ready);
     console.log('[ok] /api/sources ->', src.data.length, 'entities,', ready, 'ready');
 
-    // 5) papers list + invalid id sanitized
+    // 5) papers list + invalid id sanitized (auth boundary: anonymous 401, logged-in 200)
+    const anonPapers = await call('GET', '/api/papers');
+    if (anonPapers.status !== 401) throw new Error('anonymous GET /api/papers expected 401, got ' + anonPapers.status);
+    console.log('[ok] anonymous GET /api/papers -> 401 (intentional inbox boundary)');
     const papers = await call('GET', '/api/papers', token);
     if (papers.status !== 200 || !Array.isArray(papers.data.items)) throw new Error('papers -> ' + papers.status);
-    console.log('[ok] /api/papers ->', papers.data.total, 'papers');
+    console.log('[ok] authed GET /api/papers ->', papers.data.total, 'papers');
     const badPaper = await call('GET', '/api/papers/not-a-uuid', token);
     if (badPaper.status !== 400) throw new Error('papers/:badid expected 400, got ' + badPaper.status);
     console.log('[ok] /api/papers/not-a-uuid -> 400 sanitized');

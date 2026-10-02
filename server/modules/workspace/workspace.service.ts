@@ -121,7 +121,7 @@ export class WorkspaceService {
     const [failedRes] = await this.db
       .select({ n: count() })
       .from(sourceSyncRuns)
-      .where(sql`${sourceSyncRuns.status} = 'failed'`);
+      .where(sql`${sourceSyncRuns.status} = 'error'`);
 
     const recentRows = await this.db
       .select({ p: papers, jName: journals.name })

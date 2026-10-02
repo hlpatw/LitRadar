@@ -31,7 +31,7 @@ export const MVP_SOURCES: readonly MvpSource[] = [
   { name: 'Journal of Child Language', issn: '0305-0009', priority: 'P0', sourceType: 'journal', connectorType: 'crossref', connectorStatus: 'ready', pollPolicy: 'weekly', pageSize: 25 },
   { name: 'First Language', issn: '0142-7237', priority: 'P0', sourceType: 'journal', connectorType: 'crossref', connectorStatus: 'ready', pollPolicy: 'weekly', pageSize: 25 },
   { name: 'Applied Psycholinguistics', issn: '0142-7164', priority: 'P0', sourceType: 'journal', connectorType: 'crossref', connectorStatus: 'ready', pollPolicy: 'weekly', pageSize: 25 },
-  { name: 'Language Acquisition', issn: '1048-6928', priority: 'P1', sourceType: 'journal', connectorType: 'crossref', connectorStatus: 'ready', pollPolicy: 'biweekly', pageSize: 25 },
+  { name: 'Language Acquisition', issn: '1048-9223', priority: 'P1', sourceType: 'journal', connectorType: 'crossref', connectorStatus: 'ready', pollPolicy: 'biweekly', pageSize: 25 },
   { name: 'Bilingualism: Language and Cognition', issn: '1366-7289', priority: 'P1', sourceType: 'journal', connectorType: 'crossref', connectorStatus: 'ready', pollPolicy: 'biweekly', pageSize: 25 },
   // --- 6 authoritative-but-skeleton MVP entries ---
   { name: 'Language Development Research', issn: null, priority: 'P0', sourceType: 'journal', connectorType: 'rss', connectorStatus: 'skeleton', pollPolicy: 'weekly', pageSize: 25 },

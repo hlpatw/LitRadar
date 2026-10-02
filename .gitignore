@@ -74,3 +74,6 @@ install.log
 .npm_cache
 .env
 *.zip
+
+# local browser-only SPA proxy (machine-specific, never commit)
+scripts/local.static.mjs

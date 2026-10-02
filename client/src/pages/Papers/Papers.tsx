@@ -391,6 +391,12 @@ const Papers: React.FC = () => {
                       await papers.getPapers({
                         journalId: journalId || undefined,
                         search: search || undefined,
+                        from: from || undefined,
+                        to: to || undefined,
+                        priority: priority || undefined,
+                        hasAbstract: hasAbstract || undefined,
+                        favorite: favorite || undefined,
+                        todo: todo || undefined,
                         page: 1,
                         pageSize: PAGE_SIZE,
                       });
