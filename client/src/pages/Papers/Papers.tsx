@@ -32,7 +32,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { FavoriteButton } from '@/library/FavoriteButton';
-import { hydratePaperLibrary } from '@/library/library-store';
+import { hydratePaperLibrary, peekPaperLibraryState, subscribeLibrary } from '@/library/library-store';
 import {
   Empty,
   EmptyContent,
@@ -85,6 +85,11 @@ const Papers: React.FC = () => {
     url: '',
   });
   const [creating, setCreating] = React.useState<boolean>(false);
+
+  // Re-render the list whenever the shared store flips: in the favorite-only filter an
+  // instant unfavorite drops the card immediately, and a failed mutation rolls it back.
+  const [, bumpList] = React.useReducer((x: number) => x + 1, 0);
+  React.useEffect(() => subscribeLibrary(bumpList), []);
 
   React.useEffect(() => {
     setSearchInput(search);
@@ -479,6 +484,11 @@ const Papers: React.FC = () => {
           !error &&
           papersData &&
           papersData.items.map((paper: PaperItem) => {
+            // Favorite-only filter: drop the card the instant the store reports an unfavorite.
+            // Only an EXPLICIT cached state hides a row (never the materialized default), so a
+            // server-favorited row stays put until the user actually unfavorites it.
+            const cached = peekPaperLibraryState(paper.id);
+            if (favorite === '1' && cached && cached.isFavorite === false) return null;
             return (
               <div
                 key={paper.id}

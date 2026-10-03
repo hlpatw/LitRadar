@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../utils/axios';
+import { resetLibraryStore } from '@/library/library-store';
 
 interface User {
   id: string;
@@ -22,6 +23,18 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Wipe the shared library store whenever the authenticated identity actually changes
+  // (bootstrap swap, login, register, logout, or A->B switch) so the next user never sees
+  // the previous user's favorite/reading visuals before their own data hydrates.
+  const prevIdentityRef = React.useRef<string | null>(null);
+  useEffect(() => {
+    const nextId = user?.id ?? null;
+    if (prevIdentityRef.current !== nextId) {
+      resetLibraryStore();
+      prevIdentityRef.current = nextId;
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     const token = localStorage.getItem('token');

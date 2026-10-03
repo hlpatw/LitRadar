@@ -132,3 +132,21 @@ test('papers list: long uppercase keywords wrap inside the card (no internal hor
   assert.match(papers, /inline-block max-w-full min-w-0[\s\S]*?overflow-wrap:anywhere/, 'keyword badge must be shrinkable inline-block with overflow-wrap:anywhere');
   assert.match(papers, /whitespace-normal/, 'keyword badge must override the base badge whitespace-nowrap');
 });
+
+test("store reset: identity change wipes all entries + pending so user B sees no stale visuals", () => {
+  const store = f('client/src/library/library-store.ts');
+  assert.match(store, /export function resetLibraryStore/, 'store must export resetLibraryStore');
+  assert.match(store, /state\.clear\(\)/, 'reset must drop every cached per-paper entry');
+  assert.match(store, /pending\.clear\(\)/, 'reset must also clear all pending guards');
+  assert.match(store, /export function peekPaperLibraryState/, 'store needs a non-mutating read for list filtering');
+  const auth = f('client/src/contexts/AuthContext.tsx');
+  assert.match(auth, /resetLibraryStore\(\)/, 'AuthContext must call resetLibraryStore on identity change');
+  assert.match(auth, /prevIdentityRef|user\?\.id/, 'reset must fire on user id change (login/logout/bootstrap swap)');
+});
+
+test('papers favorite filter: unfavorited card drops instantly via store subscription (rollback restores)', () => {
+  const papers = f('client/src/pages/Papers/Papers.tsx');
+  assert.match(papers, /subscribeLibrary\(bumpList\)/, 'list must subscribe to the shared store for instant updates');
+  assert.match(papers, /peekPaperLibraryState\(paper\.id\)/, 'list must read explicit cached state (not materialize a default)');
+  assert.match(papers, /favorite === '1' && cached && cached\.isFavorite === false\) return null/, 'favorite-only filter must drop a card when the store reports unfavorited');
+});

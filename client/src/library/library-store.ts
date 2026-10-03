@@ -52,9 +52,25 @@ export function getPaperLibraryState(paperId: string): PaperLibraryState {
   return s;
 }
 
+/** Non-mutating read: returns the cached snapshot for a paper, or undefined if it was never
+ *  hydrated. Used to FILTER a list (e.g. favorite-only view) without accidentally materializing
+ *  a "favorite=false" default that would hide a server-favorited row before hydration. */
+export function peekPaperLibraryState(paperId: string): PaperLibraryState | undefined {
+  return state.get(paperId);
+}
+
 export function subscribeLibrary(cb: () => void): () => void {
   listeners.add(cb);
   return () => listeners.delete(cb);
+}
+
+/** Wipe ALL cached entries and pending actions. Called whenever the authenticated identity
+ *  changes (login / register / logout / bootstrap identity swap) so user B never briefly
+ *  sees user A's favorite/reading visuals before B's data re-hydrates. */
+export function resetLibraryStore(): void {
+  state.clear();
+  pending.clear();
+  emit();
 }
 
 export function isLibraryPending(paperId: string, action: LibraryAction): boolean {
