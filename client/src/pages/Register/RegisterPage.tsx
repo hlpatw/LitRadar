@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { getApiErrorMessage } from '@/utils/api-error';
+import {
+  MIN_PASSWORD_LENGTH,
+  MIN_USERNAME_LENGTH,
+  validateRegisterInput,
+} from '@/utils/auth-validation';
 import { logger } from '../../utils/logger';
 
 export default function RegisterPage() {
@@ -18,23 +24,21 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
 
-    if (password !== confirmPassword) {
-      setError('两次密码输入不一致');
-      return;
-    }
-
-    if (password.length < 6) {
-      setError('密码至少 6 位');
+    // Client-side guards mirror the server DTO (username>=3, valid email, password>=8).
+    const clientError = validateRegisterInput({ username, email, password, confirmPassword });
+    if (clientError) {
+      setError(clientError);
       return;
     }
 
     setSubmitting(true);
     try {
-      await register({ username, email, password, displayName: displayName || undefined });
+      // register() stores the token and sets the current user; navigating to '/'
+      // lands the authenticated user straight on the Dashboard (auto-login).
+      await register({ username: username.trim(), email: email.trim(), password, displayName: displayName.trim() || undefined });
       navigate('/');
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      setError(axiosErr.response?.data?.message ?? '注册失败');
+      setError(getApiErrorMessage(err, '注册失败，请稍后重试'));
       logger.error('注册失败', err);
     } finally {
       setSubmitting(false);
@@ -68,9 +72,13 @@ export default function RegisterPage() {
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
               required
               autoComplete="username"
+              minLength={MIN_USERNAME_LENGTH}
               className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[14.5px] text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
-              placeholder="字母、数字或下划线"
+              placeholder={`至少 ${MIN_USERNAME_LENGTH} 个字符`}
             />
+            <p className="mt-1 text-[12px] text-[var(--muted-foreground)]">
+              至少 {MIN_USERNAME_LENGTH} 个字符，用于登录和展示
+            </p>
           </div>
 
           <div>
@@ -86,6 +94,9 @@ export default function RegisterPage() {
               className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[14.5px] text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
               placeholder="you@example.com"
             />
+            <p className="mt-1 text-[12px] text-[var(--muted-foreground)]">
+              用于接收通知，每个邮箱只能注册一次
+            </p>
           </div>
 
           <div>
@@ -113,9 +124,13 @@ export default function RegisterPage() {
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
               required
               autoComplete="new-password"
+              minLength={MIN_PASSWORD_LENGTH}
               className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[14.5px] text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
-              placeholder="至少 6 位"
+              placeholder={`至少 ${MIN_PASSWORD_LENGTH} 位`}
             />
+            <p className="mt-1 text-[12px] text-[var(--muted-foreground)]">
+              至少 {MIN_PASSWORD_LENGTH} 位字母、数字或符号
+            </p>
           </div>
 
           <div>
@@ -128,6 +143,7 @@ export default function RegisterPage() {
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
               required
               autoComplete="new-password"
+              minLength={MIN_PASSWORD_LENGTH}
               className="mt-1 w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-[14.5px] text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
               placeholder="再次输入密码"
             />

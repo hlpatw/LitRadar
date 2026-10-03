@@ -25,13 +25,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (token) {
-      api.get('/auth/me').then((res) => setUser(res.data)).catch(() => {
-        localStorage.removeItem('token');
-      }).finally(() => setLoading(false));
-    } else {
+    if (!token) {
       setLoading(false);
+      return;
     }
+    // Bootstrap: prove the stored token is still valid.
+    api
+      .get('/auth/me')
+      .then((res) => setUser(res.data))
+      .catch((err: unknown) => {
+        // Stale/expired token -> 401: clear it silently. No toast, no raw status.
+        // ProtectedLayout then routes to /login because user is null.
+        if ((err as { response?: { status?: number } })?.response?.status === 401) {
+          localStorage.removeItem('token');
+        }
+        // Transient network failures leave the token in place; loading ends and the
+        // user lands on /login so they can retry without us nuking a valid session.
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
