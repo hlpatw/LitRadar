@@ -231,6 +231,13 @@ export interface LibraryState {
   changed: boolean;
   // The favorite transition this call actually performed (drives direction-aware events).
   favoriteTransition: 'none' | 'favorited' | 'unfavorited';
+  // A server-minted, per-transition token (crypto.randomUUID), PRESENT only when a real
+  // favorite transition happened (changed=true). The client builds its behavior-event
+  // idempotency key as direction+token. Because the token is minted server-side per mutation
+  // (NOT an in-memory client counter), a page reload cannot reset it: the next real
+  // favorite after an unfavorite gets a brand-new token and is never deduped/swallowed.
+  // A no-op repeat POST (double-click, changed=false) returns null so the client emits no event.
+  transitionToken: string | null;
 }
 
 export interface SetFeedbackRequest {

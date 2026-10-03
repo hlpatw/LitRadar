@@ -27,13 +27,6 @@ function weekStartKey(): string {
 // In-session guard: don't POST an impression twice for the same logical view.
 const fired = new Set<string>();
 
-// Per-paper favorite/unfavorite transition counter. The server dedupes by
-// (user, eventType, idempotencyKey); a plain `<week>:favorite:<paper>` key would collapse a
-// favorite -> unfavorite -> favorite cycle into ONE counted favorite. We append a monotonic
-// transition ordinal so each TRUE transition gets a fresh key, while the store's per-action
-// pending guard still prevents a double-click from firing twice for the same transition.
-const favSeq = new Map<string, number>();
-
 async function post(payload: { eventType: any; paperId?: string | null; idempotencyKey: string }) {
   try {
     await api.radar.trackEvent(payload);
@@ -71,14 +64,16 @@ export function trackNote(paperId: string | null | undefined) {
   void post({ eventType: 'note', paperId: paperId ?? null, idempotencyKey: key });
 }
 
-/** A favorite/unfavorite transition just succeeded on the server. Direction-aware key with a
- *  per-paper transition ordinal so re-favorites in the same week are NOT swallowed, and a
- *  double-click (guarded by the store) never double-fires the same transition. */
-export function trackFavoriteTransition(direction: 'favorite' | 'unfavorite', paperId: string) {
-  if (!paperId) return;
-  const n = (favSeq.get(paperId) ?? 0) + 1;
-  favSeq.set(paperId, n);
-  const key = `${weekStartKey()}:${direction}:${paperId}:${n}`;
+/** A favorite/unfavorite transition just succeeded on the server.
+ *
+ *  The idempotency key is built from direction + the server-minted `transitionToken`. Because
+ *  the token is a fresh UUID per real mutation (minted server-side, NOT an in-memory counter),
+ *  a page reload cannot reset it: favorite -> reload -> unfavorite -> reload -> favorite yields
+ *  three distinct keys and none is swallowed by the week's earlier events. A double-click that
+ *  the server reports as changed=false carries no token, so the store never calls this. */
+export function trackFavoriteTransition(direction: 'favorite' | 'unfavorite', paperId: string, transitionToken: string) {
+  if (!paperId || !transitionToken) return;
+  const key = `${weekStartKey()}:${direction}:${paperId}:${transitionToken}`;
   void post({ eventType: direction, paperId, idempotencyKey: key });
 }
 

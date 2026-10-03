@@ -6,7 +6,7 @@ import { isoWeekStart, weekStartKey, addWeeks } from '../radar/radar.service';
 import type { WeeklyDigest, BehaviorEventType } from '@shared/api.interface';
 
 const BLANK_ACTIONS: Record<BehaviorEventType, number> = {
-  impression: 0, detail: 0, library: 0, todo: 0, favorite: 0, uninterested: 0, note: 0,
+  impression: 0, detail: 0, library: 0, todo: 0, favorite: 0, unfavorite: 0, uninterested: 0, note: 0,
 };
 
 @Injectable()

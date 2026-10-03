@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { and, eq, ilike, or, desc, sql } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
 import { DATABASE, type Database } from '../../database/database.module';
 import { toIsoDate, toIsoDateTime } from '../../common/utils/safe-date';
 import {
@@ -264,6 +265,7 @@ export class LibraryService {
         noteCount: 0,
         changed: false,
         favoriteTransition: 'none',
+        transitionToken: null,
       };
     }
     return {
@@ -277,6 +279,7 @@ export class LibraryService {
       noteCount: joined.noteCount,
       changed: false,
       favoriteTransition: 'none',
+      transitionToken: null,
     };
   }
 
@@ -303,10 +306,15 @@ export class LibraryService {
           ? 'favorited'
           : 'unfavorited';
 
+    // Mint a fresh, globally-unique transition token ONLY on a real state change. The client
+    // keys its behavior event on direction+token, so a no-op double-click (changed=false)
+    // carries no token and emits no event, and every real toggle — even across page reloads —
+    // gets a token that cannot collide with a previous week's key.
     return {
       ...after,
       changed: favoriteTransition !== 'none',
       favoriteTransition,
+      transitionToken: favoriteTransition !== 'none' ? randomUUID() : null,
     };
   }
 

@@ -503,13 +503,13 @@ const Papers: React.FC = () => {
                         <Badge
                           key={kw.trim()}
                           variant="secondary"
-                          className="font-mono text-[10.5px] uppercase tracking-[0.06em]"
+                          className="max-w-full whitespace-normal break-words font-mono text-[10.5px] uppercase tracking-[0.06em]"
                         >
                           {kw.trim()}
                         </Badge>
                       ))}
                   </div>
-                  <div className="mt-2 flex items-center gap-3">
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
                     {paper.doi && (
                       <span className="font-mono text-[10.5px] uppercase tracking-[0.06em] text-[var(--muted-foreground)]">
                         DOI: {paper.doi}

@@ -7,13 +7,19 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const f = (p: string) => readFileSync(join(root, p), 'utf8');
 
-test('shared: LibraryState authoritative shape + unfavorite direction exist', () => {
+test('shared: LibraryState authoritative shape + unfavorite direction + transitionToken exist', () => {
   const shared = f('shared/api.interface.ts');
   assert.match(shared, /interface LibraryState/, 'LibraryState type must exist');
-  for (const field of ['rowExists', 'libraryId', 'favoriteTransition', 'changed']) {
+  for (const field of ['rowExists', 'libraryId', 'favoriteTransition', 'changed', 'transitionToken']) {
     assert.ok(shared.includes(field), `LibraryState must declare ${field}`);
   }
   assert.match(shared, /'unfavorite'/, 'BehaviorEventType must include unfavorite direction');
+});
+
+test('digest: BLANK_ACTIONS includes unfavorite:0 so an empty report never omits the new direction', () => {
+  const digest = f('server/modules/digest/digest.service.ts');
+  assert.match(digest, /BLANK_ACTIONS/, 'digest must build a blank action map');
+  assert.match(digest, /unfavorite:\s*0/, 'BLANK_ACTIONS must seed unfavorite:0');
 });
 
 test('backend: favorite mutation returns authoritative LibraryState, no fake id:null row', () => {
@@ -29,14 +35,21 @@ test('backend: favorite mutation returns authoritative LibraryState, no fake id:
   assert.match(svc, /favoriteTransition/, 'service must report the true favorite transition');
   assert.match(svc, /'favorited'/, 'favorited direction present');
   assert.match(svc, /'unfavorited'/, 'unfavorited direction present');
+  // Server-minted transition token on real change only; no in-memory client counter.
+  assert.match(svc, /randomUUID\(\)/, 'service must mint a transitionToken with crypto.randomUUID');
+  assert.match(svc, /transitionToken: favoriteTransition !== 'none' \? randomUUID\(\) : null/,
+    'token must be present only when changed=true, null on no-op double-click');
 });
 
-test('events: direction-aware favorite/unfavorite with per-paper transition ordinal', () => {
+test('events: direction-aware favorite/unfavorite keyed on the server transitionToken (no in-memory seq)', () => {
   const ev = f('client/src/utils/events.ts');
   assert.match(ev, /trackFavoriteTransition/, 'must expose a direction-aware favorite tracker');
-  assert.match(ev, /favSeq/, 'per-paper transition ordinal must exist (re-favorite not swallowed)');
-  // Plain fire-and-forget favorite keying is gone.
-  assert.ok(!/eventType:\s*'favorite'/.test(ev) || ev.includes("direction"), 'favorite event must be direction-aware');
+  // The old in-memory per-paper ordinal is gone — it reset on reload and swallowed re-favorites.
+  assert.ok(!ev.includes('favSeq'), 'in-memory favSeq must be removed (resets on reload)');
+  // Key must embed the transitionToken.
+  assert.match(ev, /transitionToken/, 'event idempotency key must use the server transitionToken');
+  assert.match(ev, /\$\{weekStartKey\(\)\}:\$\{direction\}:\$\{paperId\}:\$\{transitionToken\}/,
+    'key = week:direction:paperId:transitionToken');
 });
 
 test('FavoriteButton: filled/outline, 收藏/已收藏, aria-pressed/busy/disabled, stopPropagation', () => {
@@ -50,13 +63,14 @@ test('FavoriteButton: filled/outline, 收藏/已收藏, aria-pressed/busy/disabl
   assert.match(btn, /fill-\[var\(--primary\)\]/, 'filled star style present');
 });
 
-test('store: optimistic update + rollback + per-action pending guard + direction events', () => {
+test('store: optimistic update + rollback + per-action pending guard + direction events gated on token', () => {
   const store = f('client/src/library/library-store.ts');
   assert.match(store, /begin\(paperId, 'favorite'\)/, 'per-action pending guard used for favorite');
   assert.match(store, /hydratePaperLibrary\(paperId, prev\)/, 'failure must rollback to previous snapshot');
-  assert.match(store, /trackFavoriteTransition\('favorite'/, 'fire favorite event only on favorited transition');
-  assert.match(store, /trackFavoriteTransition\('unfavorite'/, 'fire unfavorite event on unfavorited transition');
+  assert.match(store, /trackFavoriteTransition\('favorite', paperId, res\.transitionToken\)/, 'fire favorite event with the server token');
+  assert.match(store, /trackFavoriteTransition\('unfavorite', paperId, res\.transitionToken\)/, 'fire unfavorite event with the server token');
   assert.match(store, /res\.favoriteTransition/, 'events driven by server-reported true transition');
+  assert.match(store, /res\.transitionToken/, 'event only fires when the server minted a token (changed=true)');
 });
 
 test('pages: favorite entry points use the shared FavoriteButton (no direct toggleFavorite calls)', () => {
@@ -76,6 +90,25 @@ test('pages: favorite entry points use the shared FavoriteButton (no direct togg
   assert.ok(!apiClient.includes('toggleFavorite'), 'client library API must export setFavorite, not toggleFavorite');
 });
 
+test('paper detail: favorites hydrated from user_library, never from legacy workspace/favorites', () => {
+  const pd = f('client/src/pages/Papers/PaperDetail.tsx');
+  // No favorite hydration via the old workspace projection.
+  assert.ok(!pd.includes('getFavorites'), 'PaperDetail must NOT call workspace.getFavorites()');
+  // Favorite/reading state is hydrated from the authoritative user_library endpoint.
+  assert.match(pd, /libraryApi\.getLibrary\(\)/, 'PaperDetail must hydrate from user_library list');
+  assert.match(pd, /row\?\.isFavorite/, 'PaperDetail must read isFavorite from the user_library row');
+  // Every favorite-capable UI surface must be free of legacy favorite reads.
+  for (const p of [
+    'client/src/components/RadarSection.tsx',
+    'client/src/pages/Papers/Papers.tsx',
+    'client/src/pages/Papers/PaperDetail.tsx',
+    'client/src/pages/Sources/SourceDetail.tsx',
+    'client/src/pages/Library/Library.tsx',
+  ]) {
+    assert.ok(!f(p).includes('getFavorites'), `${p} must not read favorites via the legacy workspace endpoint`);
+  }
+});
+
 test('layout: md and below use a hamburger Sheet drawer; single responsive gutter; min-w-0 main', () => {
   const layout = f('client/src/components/Layout.tsx');
   // persistent sidebar hidden below lg (e.g. "hidden ... lg:flex")
@@ -89,4 +122,10 @@ test('layout: md and below use a hamburger Sheet drawer; single responsive gutte
   const papers = f('client/src/pages/Papers/Papers.tsx');
   assert.ok(!dash.includes('max-w-[1080px]'), 'Dashboard must not re-declare the centered container');
   assert.ok(!papers.includes('max-w-[1080px]'), 'Papers must not re-declare the centered container');
+});
+test('papers list: long uppercase keywords wrap inside the card (no internal horizontal scroll)', () => {
+  const papers = f('client/src/pages/Papers/Papers.tsx');
+  assert.match(papers, /min-w-0 flex-1/, 'paper card text column must be min-w-0 flex-1');
+  assert.match(papers, /flex flex-wrap items-center gap-2/, 'keyword chips container must flex-wrap');
+  assert.match(papers, /max-w-full whitespace-normal break-words/, 'keyword badge must wrap long tokens (no nowrap overflow)');
 });

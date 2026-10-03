@@ -97,7 +97,12 @@ async function main() {
     if (s.isFavorite !== true) throw new Error('isFavorite must be true');
     if (s.favoriteTransition !== 'favorited') throw new Error('transition must be favorited, got ' + s.favoriteTransition);
     if (s.changed !== true) throw new Error('changed must be true on real transition');
-    console.log('[ok] favorite -> authoritative LibraryState {rowExists, libraryId, favorited, changed}');
+    // A real transition MUST carry a fresh server-minted transitionToken (a UUID).
+    if (typeof s.transitionToken !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(s.transitionToken)) {
+      throw new Error('favorite must return a UUID transitionToken, got ' + JSON.stringify(s.transitionToken));
+    }
+    const tokFav1 = s.transitionToken;
+    console.log('[ok] favorite -> authoritative LibraryState {rowExists, libraryId, favorited, changed, transitionToken}');
 
     // refresh: library list agrees
     let lib = await call('GET', '/api/library', t1);
@@ -114,10 +119,11 @@ async function main() {
     const again = await call('POST', `/api/library/${P.id}/favorite`, t1, { isFavorite: true });
     if (again.data.favoriteTransition !== 'none') throw new Error('repeat favorite=true must be no-op, got ' + again.data.favoriteTransition);
     if (again.data.changed !== false) throw new Error('repeat favorite=true must not be a change');
+    if (again.data.transitionToken !== null) throw new Error('double-click (changed=false) must NOT mint a transitionToken, got ' + JSON.stringify(again.data.transitionToken));
     lib = await call('GET', '/api/library', t1);
     const occ = lib.data.items.filter((i: any) => i.paperId === P.id).length;
     if (occ !== 1) throw new Error(`double-click created ${occ} rows, want 1 (UNIQUE user+paper)`);
-    console.log('[ok] double-click idempotent: no transition, still exactly one row');
+    console.log('[ok] double-click idempotent: no transition, no token, still exactly one row');
 
     // ── unfavorite ──
     const unfav = await call('POST', `/api/library/${P.id}/favorite`, t1, { isFavorite: false });
@@ -129,7 +135,10 @@ async function main() {
     if (u.isFavorite !== false) throw new Error('isFavorite must be false');
     if (u.favoriteTransition !== 'unfavorited') throw new Error('transition must be unfavorited, got ' + u.favoriteTransition);
     if (u.changed !== true) throw new Error('changed must be true');
-    console.log('[ok] unfavorite -> rowExists=false, libraryId=null (no fake id:null), direction=unfavorited');
+    if (typeof u.transitionToken !== 'string' || !u.transitionToken) throw new Error('unfavorite must mint a transitionToken');
+    if (u.transitionToken === tokFav1) throw new Error('unfavorite token must differ from the earlier favorite token');
+    const tokUnfav = u.transitionToken;
+    console.log('[ok] unfavorite -> rowExists=false, libraryId=null (no fake id:null), direction=unfavorited, fresh token');
 
     // favorite-filter disappearance + refresh consistency
     const favFilter = await call('GET', '/api/library?status=favorite', t1);
@@ -139,11 +148,36 @@ async function main() {
     console.log('[ok] favorite-filter + refresh: unfavorited paper gone');
 
     // ── re-favorite (direction cycle: favorited -> unfavorited -> favorited) ──
+    // This models favorite -> reload -> unfavorite -> reload -> favorite: the token is minted
+    // server-side per real transition, so it cannot reset across a reload and must be fresh.
     const refav = await call('POST', `/api/library/${P.id}/favorite`, t1, { isFavorite: true });
     if (refav.data.favoriteTransition !== 'favorited') throw new Error('re-favorite must be favorited');
     if (refav.data.rowExists !== true) throw new Error('re-favorite must bring the row back');
+    const tokFav2 = refav.data.transitionToken;
+    if (typeof tokFav2 !== 'string' || !tokFav2) throw new Error('re-favorite must mint a transitionToken');
+    if (tokFav2 === tokFav1 || tokFav2 === tokUnfav) throw new Error('re-favorite token must be globally fresh (not reused)');
+    console.log('[ok] re-favorite after unfavorite works; three transition tokens all distinct');
+
+    // ── events: key the behavior event on direction + server token; the 3 real transitions
+    //    must produce exactly 3 recorded events even though favorite ran twice. ──
+    const ok2xx = (r: { status: number }) => r.status === 200 || r.status === 201;
+    const week = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
+    const kFav1 = `${week}:favorite:${P.id}:${tokFav1}`;
+    const kUnf = `${week}:unfavorite:${P.id}:${tokUnfav}`;
+    const kFav2 = `${week}:favorite:${P.id}:${tokFav2}`;
+    const eFav1 = await call('POST', '/api/events', t1, { eventType: 'favorite', paperId: P.id, idempotencyKey: kFav1 });
+    if (!ok2xx(eFav1) || eFav1.data.recorded !== true) throw new Error('favorite#1 event not recorded: ' + eFav1.status);
+    const eUnf = await call('POST', '/api/events', t1, { eventType: 'unfavorite', paperId: P.id, idempotencyKey: kUnf });
+    if (!ok2xx(eUnf) || eUnf.data.recorded !== true) throw new Error('unfavorite event not recorded: ' + eUnf.status);
+    const eFav2 = await call('POST', '/api/events', t1, { eventType: 'favorite', paperId: P.id, idempotencyKey: kFav2 });
+    if (eFav2.data.recorded !== true) throw new Error('re-favorite event must NOT be swallowed by the earlier favorite (fresh token)');
+    // Replay of the SAME transition's token key dedupes (idempotent).
+    const eFav2dup = await call('POST', '/api/events', t1, { eventType: 'favorite', paperId: P.id, idempotencyKey: kFav2 });
+    if (eFav2dup.data.recorded !== false) throw new Error('replaying the same transition token must dedupe');
+    console.log('[ok] events: favorite->unfavorite->favorite = exactly 3 recorded; replay of same token deduped; reload cannot reuse keys');
+
     await call('DELETE', `/api/library/${P.id}`, t1);
-    console.log('[ok] re-favorite after unfavorite works (cycle preserved)');
+    console.log('[ok] re-favorite cycle preserved');
 
     // ── two-user isolation ──
     await call('POST', `/api/library/${Q.id}/favorite`, t2, { isFavorite: true });
@@ -155,17 +189,6 @@ async function main() {
     if (t2libP.data.items.some((i: any) => i.paperId === P.id)) throw new Error('u2 sees u1 history');
     console.log('[ok] two-user favorite isolation (no cross-leak)');
 
-    // ── events: direction-aware, idempotent keys, unfavorite accepted ──
-    const ok2xx = (r: { status: number }) => r.status === 200 || r.status === 201;
-    const ev1 = await call('POST', '/api/events', t1, { eventType: 'favorite', paperId: Q.id, idempotencyKey: 'wk:favorite:' + Q.id + ':1' });
-    if (!ok2xx(ev1) || ev1.data.recorded !== true) throw new Error('favorite event not recorded: ' + ev1.status + ' ' + JSON.stringify(ev1.data));
-    const ev1dup = await call('POST', '/api/events', t1, { eventType: 'favorite', paperId: Q.id, idempotencyKey: 'wk:favorite:' + Q.id + ':1' });
-    if (ev1dup.data.recorded !== false) throw new Error('duplicate favorite event should be deduped');
-    const evUnfav = await call('POST', '/api/events', t1, { eventType: 'unfavorite', paperId: Q.id, idempotencyKey: 'wk:unfavorite:' + Q.id + ':1' });
-    if (!ok2xx(evUnfav) || evUnfav.data.recorded !== true) throw new Error('unfavorite event must be accepted (new direction): ' + evUnfav.status + ' ' + JSON.stringify(evUnfav.data));
-    const ev2 = await call('POST', '/api/events', t1, { eventType: 'favorite', paperId: Q.id, idempotencyKey: 'wk:favorite:' + Q.id + ':2' });
-    if (ev2.data.recorded !== true) throw new Error('re-favorite (new ordinal) must NOT be swallowed');
-    console.log('[ok] events: favorite/unfavorite directions recorded; dup deduped; re-favorite not swallowed');
 
     console.log('\n=== LIBRARY INTERACTION E2E PASSED ===');
   } finally {

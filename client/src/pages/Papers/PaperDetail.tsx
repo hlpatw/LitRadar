@@ -3,11 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Pencil, Trash2, CheckSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '../../utils/logger';
-import { papers, workspace } from '@/api';
+import { papers, workspace, library as libraryApi } from '@/api';
 import type {
   PaperDetail as PaperDetailType,
-  FavoriteItem,
-  ChecklistItem,
+  LibraryListResponse,
   NoteItem,
   UpdatePaperRequest,
 } from '@shared/api.interface';
@@ -79,29 +78,29 @@ const PaperDetailPage: React.FC = () => {
     if (!id) return;
     setLoading(true);
     setError(null);
+    // Favorite / reading-state hydration comes ONLY from the authoritative user_library list.
+    // The legacy workspace/favorites endpoint is deliberately NOT read here anymore — favorites
+    // must never be hydrated from the old projection. Notes remain on the legacy notes endpoint
+    // (a separate, compatibility-only concern).
     Promise.all([
       papers.getPaperDetail(id),
-      workspace.getFavorites(),
-      workspace.getChecklist(),
+      libraryApi.getLibrary(),
       workspace.getNotes(),
     ])
       .then(
-        ([paperData, favs, checklist, allNotes]: [
+        ([paperData, libResp, allNotes]: [
           PaperDetailType,
-          FavoriteItem[],
-          ChecklistItem[],
+          LibraryListResponse,
           NoteItem[],
         ]) => {
           setPaper(paperData);
-          // Hydrate the shared store with this paper's authoritative library state.
-          const fav = favs.some((f: FavoriteItem) => f.paperId === id);
-          const cl = checklist.find((c) => c.paperId === id);
+          const row = libResp.items.find((i) => i.paperId === id);
           hydratePaperLibrary(id, {
-            isFavorite: fav,
-            inLibrary: fav || !!cl,
-            readingState: cl
-              ? cl.status === 'done' ? 'read' : cl.status === 'in_progress' ? 'reading' : 'todo'
-              : null,
+            isFavorite: row?.isFavorite ?? false,
+            inLibrary: !!row,
+            readingState: row?.readingState ?? null,
+            personalTags: row?.personalTags ?? null,
+            noteCount: row?.noteCount ?? 0,
           });
           setNotes(allNotes.filter((n: NoteItem) => n.paperId === id));
           setLoading(false);

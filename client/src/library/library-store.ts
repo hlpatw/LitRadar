@@ -105,13 +105,14 @@ export async function toggleFavorite(paperId: string): Promise<FavoriteTransitio
   try {
     const res = await api.library.setFavorite(paperId, target);
     applyServerState(paperId, res); // authoritative overwrite (may differ from optimistic)
-    // events ONLY on a true server transition, direction-aware
-    if (res.favoriteTransition === 'favorited') {
-      trackFavoriteTransition('favorite', paperId);
+    // events ONLY on a real server transition. The server mints a fresh transitionToken exactly
+    // when changed=true; a no-op double-click returns no token and we emit nothing.
+    if (res.favoriteTransition === 'favorited' && res.transitionToken) {
+      trackFavoriteTransition('favorite', paperId, res.transitionToken);
       trackLibrary(paperId);
       toast.success('已收藏');
-    } else if (res.favoriteTransition === 'unfavorited') {
-      trackFavoriteTransition('unfavorite', paperId);
+    } else if (res.favoriteTransition === 'unfavorited' && res.transitionToken) {
+      trackFavoriteTransition('unfavorite', paperId, res.transitionToken);
       toast.success('已取消收藏');
     } else {
       toast.success(target ? '已收藏' : '已取消收藏');
