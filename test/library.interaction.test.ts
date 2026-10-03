@@ -127,5 +127,8 @@ test('papers list: long uppercase keywords wrap inside the card (no internal hor
   const papers = f('client/src/pages/Papers/Papers.tsx');
   assert.match(papers, /min-w-0 flex-1/, 'paper card text column must be min-w-0 flex-1');
   assert.match(papers, /flex flex-wrap items-center gap-2/, 'keyword chips container must flex-wrap');
-  assert.match(papers, /max-w-full whitespace-normal break-words/, 'keyword badge must wrap long tokens (no nowrap overflow)');
+  // inline-block (NOT inline-flex) + min-w-0 + max-w-full lets a 97-char no-space token
+  // actually shrink and wrap; overflow-wrap:anywhere makes min-content small inside the chip.
+  assert.match(papers, /inline-block max-w-full min-w-0[\s\S]*?overflow-wrap:anywhere/, 'keyword badge must be shrinkable inline-block with overflow-wrap:anywhere');
+  assert.match(papers, /whitespace-normal/, 'keyword badge must override the base badge whitespace-nowrap');
 });

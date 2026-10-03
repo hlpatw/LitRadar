@@ -503,7 +503,7 @@ const Papers: React.FC = () => {
                         <Badge
                           key={kw.trim()}
                           variant="secondary"
-                          className="max-w-full whitespace-normal break-words font-mono text-[10.5px] uppercase tracking-[0.06em]"
+                          className="inline-block max-w-full min-w-0 align-middle whitespace-normal [overflow-wrap:anywhere] font-mono text-[10.5px] uppercase tracking-[0.06em]"
                         >
                           {kw.trim()}
                         </Badge>
