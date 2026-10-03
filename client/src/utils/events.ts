@@ -27,6 +27,13 @@ function weekStartKey(): string {
 // In-session guard: don't POST an impression twice for the same logical view.
 const fired = new Set<string>();
 
+// Per-paper favorite/unfavorite transition counter. The server dedupes by
+// (user, eventType, idempotencyKey); a plain `<week>:favorite:<paper>` key would collapse a
+// favorite -> unfavorite -> favorite cycle into ONE counted favorite. We append a monotonic
+// transition ordinal so each TRUE transition gets a fresh key, while the store's per-action
+// pending guard still prevents a double-click from firing twice for the same transition.
+const favSeq = new Map<string, number>();
+
 async function post(payload: { eventType: any; paperId?: string | null; idempotencyKey: string }) {
   try {
     await api.radar.trackEvent(payload);
@@ -64,8 +71,20 @@ export function trackNote(paperId: string | null | undefined) {
   void post({ eventType: 'note', paperId: paperId ?? null, idempotencyKey: key });
 }
 
-/** Action events with their own stable keys (favorite/todo/uninterested). */
-export function trackAction(eventType: 'favorite' | 'todo' | 'uninterested', paperId: string) {
+/** A favorite/unfavorite transition just succeeded on the server. Direction-aware key with a
+ *  per-paper transition ordinal so re-favorites in the same week are NOT swallowed, and a
+ *  double-click (guarded by the store) never double-fires the same transition. */
+export function trackFavoriteTransition(direction: 'favorite' | 'unfavorite', paperId: string) {
+  if (!paperId) return;
+  const n = (favSeq.get(paperId) ?? 0) + 1;
+  favSeq.set(paperId, n);
+  const key = `${weekStartKey()}:${direction}:${paperId}:${n}`;
+  void post({ eventType: direction, paperId, idempotencyKey: key });
+}
+
+/** Action events with their own stable keys (todo/uninterested). Favorite transitions go
+ *  through {@link trackFavoriteTransition} so direction + ordinal are handled. */
+export function trackAction(eventType: 'todo' | 'uninterested', paperId: string) {
   if (!paperId) return;
   const key = `${weekStartKey()}:${eventType}:${paperId}`;
   void post({ eventType, paperId, idempotencyKey: key });

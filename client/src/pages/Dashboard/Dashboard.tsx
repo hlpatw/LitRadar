@@ -27,12 +27,10 @@ const Dashboard: React.FC = () => {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-[1080px] px-8 py-7">
-        <div className="rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-[22px_24px]">
-          <p className="text-[14.5px] leading-[1.6] text-[var(--muted-foreground)]">
-            数据加载失败：{error}
-          </p>
-        </div>
+      <div className="rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-[22px_24px]">
+        <p className="text-[14.5px] leading-[1.6] text-[var(--muted-foreground)]">
+          数据加载失败：{error}
+        </p>
       </div>
     );
   }
@@ -49,9 +47,9 @@ const Dashboard: React.FC = () => {
       ];
 
   return (
-    <div className="mx-auto max-w-[1080px] px-8 py-7">
+    <>
       <h1
-        className="font-serif text-[42px] font-bold leading-[1.06] -tracking-[0.015em] text-[var(--foreground)]"
+        className="font-serif text-[32px] font-bold leading-[1.06] -tracking-[0.015em] text-[var(--foreground)] max-sm:text-[26px]"
         style={{ fontFamily: 'Charter, Georgia, PingFang SC, serif' }}
       >
         Dashboard
@@ -151,7 +149,7 @@ const Dashboard: React.FC = () => {
           )}
         </div>
       </section>
-    </div>
+    </>
   );
 };
 

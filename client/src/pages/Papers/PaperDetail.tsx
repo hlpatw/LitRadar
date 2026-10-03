@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Star, Pencil, Trash2, CheckSquare } from 'lucide-react';
+import { ChevronLeft, Pencil, Trash2, CheckSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '../../utils/logger';
 import { papers, workspace } from '@/api';
@@ -20,6 +20,9 @@ import { Spinner } from '@/components/ui/spinner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
 import { trackNote } from '@/utils/events';
+import { FavoriteButton } from '@/library/FavoriteButton';
+import { hydratePaperLibrary, addTodo } from '@/library/library-store';
+import { usePaperLibraryState, useLibraryPending } from '@/library/use-paper-library';
 import {
   Dialog,
   DialogContent,
@@ -47,15 +50,16 @@ const PaperDetailPage: React.FC = () => {
   const canWrite = !!user?.isAdmin;
 
   const [paper, setPaper] = React.useState<PaperDetailType | null>(null);
-  const [favorites, setFavorites] = React.useState<FavoriteItem[]>([]);
-  const [inChecklist, setInChecklist] = React.useState<boolean>(false);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [togglingFav, setTogglingFav] = React.useState<boolean>(false);
-  const [togglingTodo, setTogglingTodo] = React.useState<boolean>(false);
   const [noteDraft, setNoteDraft] = React.useState<string>('');
   const [savingNote, setSavingNote] = React.useState<boolean>(false);
   const [notes, setNotes] = React.useState<NoteItem[]>([]);
+
+  // Current authoritative library state + pending flags come from the shared store so the
+  // favorite / todo buttons match every other surface and stay in sync cross-page.
+  const libState = usePaperLibraryState(id ?? '');
+  const todoBusy = useLibraryPending(id ?? '', 'todo');
 
   // Edit dialog
   const [editOpen, setEditOpen] = React.useState<boolean>(false);
@@ -89,8 +93,16 @@ const PaperDetailPage: React.FC = () => {
           NoteItem[],
         ]) => {
           setPaper(paperData);
-          setFavorites(favs);
-          setInChecklist(checklist.some((c) => c.paperId === id));
+          // Hydrate the shared store with this paper's authoritative library state.
+          const fav = favs.some((f: FavoriteItem) => f.paperId === id);
+          const cl = checklist.find((c) => c.paperId === id);
+          hydratePaperLibrary(id, {
+            isFavorite: fav,
+            inLibrary: fav || !!cl,
+            readingState: cl
+              ? cl.status === 'done' ? 'read' : cl.status === 'in_progress' ? 'reading' : 'todo'
+              : null,
+          });
           setNotes(allNotes.filter((n: NoteItem) => n.paperId === id));
           setLoading(false);
         },
@@ -101,53 +113,6 @@ const PaperDetailPage: React.FC = () => {
         setLoading(false);
       });
   }, [id]);
-
-  const isFav: boolean = paper
-    ? favorites.some((f: FavoriteItem) => f.paperId === paper.id)
-    : false;
-
-  const toggleFavorite = async (): Promise<void> => {
-    if (!paper) return;
-    setTogglingFav(true);
-    try {
-      if (isFav) {
-        await workspace.removeFavorite(paper.id);
-        setFavorites((prev: FavoriteItem[]) =>
-          prev.filter((f: FavoriteItem) => f.paperId !== paper.id),
-        );
-        toast.success('已取消收藏');
-      } else {
-        await workspace.addFavorite(paper.id);
-        const updated: FavoriteItem[] = await workspace.getFavorites();
-        setFavorites(updated);
-        toast.success('已加入收藏');
-      }
-    } catch (err: unknown) {
-      logger.error('收藏操作失败', err);
-      toast.error(isFav ? '取消收藏失败' : '收藏失败');
-    } finally {
-      setTogglingFav(false);
-    }
-  };
-
-  const toggleChecklist = async (): Promise<void> => {
-    if (!paper) return;
-    setTogglingTodo(true);
-    try {
-      if (inChecklist) {
-        toast.info('请在待读列表页移除该论文');
-      } else {
-        await workspace.createChecklistItem({ paperId: paper.id, status: 'todo' });
-        setInChecklist(true);
-        toast.success('已加入待读');
-      }
-    } catch (err: unknown) {
-      logger.error('更新待读失败', err);
-      toast.error('操作失败');
-    } finally {
-      setTogglingTodo(false);
-    }
-  };
 
   const saveNote = async (): Promise<void> => {
     if (!paper || !noteDraft.trim()) return;
@@ -377,31 +342,17 @@ const PaperDetailPage: React.FC = () => {
 
       {/* Actions */}
       <div className="mt-10 flex flex-wrap items-center gap-3">
+        {paper && <FavoriteButton paperId={paper.id} labeled />}
         <Button
-          onClick={toggleFavorite}
-          disabled={togglingFav}
+          onClick={() => id && void addTodo(id)}
+          disabled={todoBusy || !!libState.readingState}
           variant="outline"
           className="rounded-[8px]"
         >
-          {togglingFav ? (
-            <Spinner className="size-4" />
-          ) : (
-            <Star
-              className={`size-4 ${
-                isFav ? 'fill-[var(--primary)] text-[var(--primary)]' : ''
-              }`}
-            />
-          )}
-          {isFav ? '已收藏' : '收藏'}
-        </Button>
-        <Button
-          onClick={toggleChecklist}
-          disabled={togglingTodo || inChecklist}
-          variant="outline"
-          className="rounded-[8px]"
-        >
-          {togglingTodo ? <Spinner className="size-4" /> : <CheckSquare className="size-4" />}
-          {inChecklist ? '已在待读' : '加入待读'}
+          {todoBusy ? <Spinner className="size-4" /> : <CheckSquare className="size-4" />}
+          {libState.readingState
+            ? `已在待读（${libState.readingState === 'read' ? '已读' : libState.readingState === 'reading' ? '阅读中' : '待读'}）`
+            : '加入待读'}
         </Button>
         {canWrite && (
         <>

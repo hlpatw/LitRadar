@@ -22,6 +22,7 @@ import type {
   SetFeedbackRequest,
   RecommendationResponse,
   RecWeights,
+  LibraryState,
 } from '@shared/api.interface';
 
 @UseGuards(JwtAuthGuard)
@@ -80,14 +81,15 @@ export class LibraryController {
 
   @Post(':paperId/favorite')
   @HttpCode(200)
-  async toggleFavorite(
+  async setFavorite(
     @Req() req: Request,
     @Param('paperId') paperId: string,
     @Body() body: { isFavorite?: boolean },
-  ): Promise<LibraryItem> {
+  ): Promise<LibraryState> {
     const userId = getAuthenticatedUserId(req);
-    // quick action: flip favorite (default true) without disturbing reading state.
-    return this.libraryService.upsert(userId, paperId, { isFavorite: body.isFavorite ?? true });
+    // Authoritative quick action: returns the post-state snapshot (with explicit rowExists /
+    // favoriteTransition) rather than a fake LibraryItem with id:null when the row was removed.
+    return this.libraryService.setFavorite(userId, paperId, body.isFavorite ?? true);
   }
 
   @Post(':paperId/reading-state')

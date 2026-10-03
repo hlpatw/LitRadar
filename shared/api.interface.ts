@@ -204,6 +204,35 @@ export interface UpsertLibraryRequest {
   personalTags?: string | null;
 }
 
+// Authoritative per-paper library snapshot returned by the favorite quick-action.
+//
+// A user has AT MOST one (user,paper) row in `user_library`. Unfavoriting a paper that carried
+// no reading state / tags DELETES that row (so the paper re-enters recommendations). The old
+// favorite endpoint faked a `LibraryItem` with `id:null` in that case, which left the client
+// unable to distinguish "row exists, favorite off" from "no row at all". This shape makes the
+// two cases explicit:
+//   * rowExists=true  -> a library association exists; libraryId is the real row id.
+//   * rowExists=false -> NO association; libraryId is null. isFavorite/readingState are the
+//     authoritative empty values (false / null). There is deliberately no fake id.
+//
+// `changed` / `favoriteTransition` let the client fire behavior events ONLY on a real state
+// transition and know its direction (favorite vs unfavorite), so a re-favorite in the same
+// week is never swallowed by the dedupe key.
+export interface LibraryState {
+  paperId: string;
+  rowExists: boolean;
+  libraryId: string | null;
+  isFavorite: boolean;
+  readingState: ReadingState | null;
+  personalTags: string | null;
+  addedAt: string | null;
+  noteCount: number;
+  // Did this mutation change persisted state at all (favorite toggled on/off)?
+  changed: boolean;
+  // The favorite transition this call actually performed (drives direction-aware events).
+  favoriteTransition: 'none' | 'favorited' | 'unfavorited';
+}
+
 export interface SetFeedbackRequest {
   feedbackType?: 'uninterested';
   note?: string;
@@ -354,6 +383,7 @@ export type BehaviorEventType =
   | 'library'
   | 'todo'
   | 'favorite'
+  | 'unfavorite'
   | 'uninterested'
   | 'note';
 

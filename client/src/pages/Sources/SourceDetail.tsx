@@ -38,7 +38,8 @@ import {
   EmptyDescription,
 } from '@/components/ui/empty';
 import { getSourceDetail, getSourcePapers, type SourcePapersQuery } from '../../api/sources';
-import { library as libraryApi } from '@/api';
+import { FavoriteButton } from '@/library/FavoriteButton';
+import { hydratePaperLibrary, addTodo } from '@/library/library-store';
 import type {
   SourceDetail as SourceDetailType,
   SourcePaperItem,
@@ -112,6 +113,14 @@ export default function SourceDetail() {
         setItems(res.items);
         setTotal(res.total);
         setDetail(res.source);
+        // Hydrate the shared store so favorite buttons stay authoritative and cross-page synced.
+        for (const it of res.items) {
+          hydratePaperLibrary(it.id, {
+            inLibrary: it.inLibrary,
+            isFavorite: it.isFavorite,
+            readingState: it.readingState,
+          });
+        }
       })
       .catch((e) => setError(errMsg(e, '加载论文失败')))
       .finally(() => setLoading(false));
@@ -130,31 +139,13 @@ export default function SourceDetail() {
     setSearch(searchInput.trim());
   };
 
-  const addTodo = async (paper: SourcePaperItem) => {
+  const onAddTodo = async (paper: SourcePaperItem) => {
     setBusyPaper(paper.id);
     try {
-      // Quick add-to-list: non-downgrade upsert. If already reading/read, the server keeps
-      // the more advanced state and returns the actual row; we surface that, never cycling back.
-      const res = await libraryApi.upsertLibrary(paper.id, { readingState: 'todo' });
-      toast.success(
-        res.readingState && res.readingState !== 'todo'
-          ? `已在书架中（${STATE_LABEL[res.readingState]}），保持当前状态`
-          : '已加入待读',
-      );
-      fetchPapers();
-    } catch (e: any) {
-      toast.error(errMsg(e, '操作失败'));
+      await addTodo(paper.id); // shared store: optimistic, pending guard, toast, events
+      await fetchPapers();     // refresh the row's reading-state badge / button
     } finally {
       setBusyPaper(null);
-    }
-  };
-
-  const toggleFav = async (paper: SourcePaperItem) => {
-    try {
-      await libraryApi.toggleFavorite(paper.id, !paper.isFavorite);
-      fetchPapers();
-    } catch (e: any) {
-      toast.error(errMsg(e, '操作失败'));
     }
   };
 
@@ -389,16 +380,13 @@ export default function SourceDetail() {
                     variant="outline"
                     className="h-7 text-xs rounded-[8px]"
                     disabled={busyPaper === p.id}
-                    onClick={() => addTodo(p)}
+                    onClick={() => onAddTodo(p)}
                   >
                     <BookOpen className="size-3.5" />
                     {busyPaper === p.id ? '加入中…' : '加入待读'}
                   </Button>
                 )}
-                <Button size="sm" variant="outline" className="h-7 text-xs rounded-[8px]" onClick={() => toggleFav(p)}>
-                  <Star className={`size-3.5 ${p.isFavorite ? 'fill-[var(--primary)] text-[var(--primary)]' : ''}`} />
-                  {p.isFavorite ? '已收藏' : '收藏'}
-                </Button>
+                <FavoriteButton paperId={p.id} labeled />
               </div>
             </div>
           ))

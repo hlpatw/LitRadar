@@ -1,13 +1,12 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Star, Search, Plus } from 'lucide-react';
+import { Search, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '../../utils/logger';
-import { journals, papers, workspace } from '@/api';
+import { journals, papers, library as libraryApi } from '@/api';
 import type {
   JournalItem,
   PaperItem,
-  FavoriteItem,
   PaginatedResponse,
 } from '@shared/api.interface';
 import { Button } from '@/components/ui/button';
@@ -30,9 +29,10 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Spinner } from '@/components/ui/spinner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
+import { FavoriteButton } from '@/library/FavoriteButton';
+import { hydratePaperLibrary } from '@/library/library-store';
 import {
   Empty,
   EmptyContent,
@@ -70,10 +70,8 @@ const Papers: React.FC = () => {
   const [journalsList, setJournalsList] = React.useState<JournalItem[]>([]);
   const [papersData, setPapersData] =
     React.useState<PaginatedResponse<PaperItem> | null>(null);
-  const [favorites, setFavorites] = React.useState<FavoriteItem[]>([]);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [togglingIds, setTogglingIds] = React.useState<Set<string>>(new Set());
   const [createOpen, setCreateOpen] = React.useState<boolean>(false);
   const [createForm, setCreateForm] = React.useState({
     title: '',
@@ -99,10 +97,16 @@ const Papers: React.FC = () => {
       .catch((err: unknown) => logger.error('获取期刊列表失败', err));
   }, []);
 
+  // Hydrate the shared library store with the authoritative favorite set (user_library), so
+  // every row's FavoriteButton reflects current state and stays in sync across pages.
   React.useEffect(() => {
-    workspace
-      .getFavorites()
-      .then((data: FavoriteItem[]) => setFavorites(data))
+    libraryApi
+      .getLibrary({ status: 'favorite' })
+      .then((data) => {
+        for (const item of data.items) {
+          hydratePaperLibrary(item.paperId, { isFavorite: item.isFavorite, inLibrary: true, readingState: item.readingState });
+        }
+      })
       .catch((err: unknown) => logger.error('获取收藏列表失败', err));
   }, []);
 
@@ -155,43 +159,9 @@ const Papers: React.FC = () => {
     ? Math.ceil(papersData.total / PAGE_SIZE)
     : 0;
 
-  const favoriteSet: Set<string> = new Set(
-    favorites.map((f: FavoriteItem) => f.paperId),
-  );
-
-  const toggleFavorite = async (
-    paperId: string,
-    isFav: boolean,
-  ): Promise<void> => {
-    setTogglingIds((prev: Set<string>) => new Set(prev).add(paperId));
-    try {
-      if (isFav) {
-        await workspace.removeFavorite(paperId);
-        setFavorites((prev: FavoriteItem[]) =>
-          prev.filter((f: FavoriteItem) => f.paperId !== paperId),
-        );
-        toast.success('已取消收藏');
-      } else {
-        await workspace.addFavorite(paperId);
-        const updated: FavoriteItem[] = await workspace.getFavorites();
-        setFavorites(updated);
-        toast.success('已加入收藏');
-      }
-    } catch (err: unknown) {
-      logger.error('收藏操作失败', err);
-      toast.error(isFav ? '取消收藏失败' : '收藏失败');
-    } finally {
-      setTogglingIds((prev: Set<string>) => {
-        const next: Set<string> = new Set(prev);
-        next.delete(paperId);
-        return next;
-      });
-    }
-  };
-
   return (
-    <div className="mx-auto my-[28px] max-w-[1080px] px-8 max-sm:px-4">
-      <h1 className="font-serif text-[42px] font-bold leading-[1.06] tracking-[-0.015em] max-sm:text-[32px]">
+    <>
+      <h1 className="font-serif text-[32px] font-bold leading-[1.06] tracking-[-0.015em] max-sm:text-[26px]">
         论文浏览
       </h1>
 
@@ -509,8 +479,6 @@ const Papers: React.FC = () => {
           !error &&
           papersData &&
           papersData.items.map((paper: PaperItem) => {
-            const isFav: boolean = favoriteSet.has(paper.id);
-            const isToggling: boolean = togglingIds.has(paper.id);
             return (
               <div
                 key={paper.id}
@@ -556,25 +524,9 @@ const Papers: React.FC = () => {
                     )}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => toggleFavorite(paper.id, isFav)}
-                  disabled={isToggling}
-                  className="mt-1 shrink-0 cursor-pointer rounded border-none bg-transparent p-1 transition-colors hover:bg-[var(--accent)]"
-                  aria-label={isFav ? '取消收藏' : '收藏'}
-                >
-                  {isToggling ? (
-                    <Spinner className="size-5" />
-                  ) : (
-                    <Star
-                      className={`size-5 ${
-                        isFav
-                          ? 'fill-[var(--primary)] text-[var(--primary)]'
-                          : 'text-[var(--muted-foreground)]'
-                      }`}
-                    />
-                  )}
-                </button>
+                <div className="mt-1 shrink-0">
+                  <FavoriteButton paperId={paper.id} />
+                </div>
               </div>
             );
           })}
@@ -627,7 +579,7 @@ const Papers: React.FC = () => {
           </Pagination>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

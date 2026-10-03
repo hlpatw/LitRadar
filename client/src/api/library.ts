@@ -4,6 +4,7 @@ import type {
   LibraryListResponse,
   UpsertLibraryRequest,
   RecommendationResponse,
+  LibraryState,
 } from '@shared/api.interface';
 
 const BASE = '/library';
@@ -36,7 +37,13 @@ export async function removeLibrary(paperId: string): Promise<void> {
   await api.delete(`${BASE}/${paperId}`);
 }
 
-export async function toggleFavorite(paperId: string, isFavorite = true): Promise<LibraryItem> {
+/**
+ * Authoritative favorite quick-action. Sets the favorite target state and returns the
+ * post-state snapshot, which explicitly represents "no library row" (rowExists=false,
+ * libraryId=null) — never a fake LibraryItem with id:null — and reports the actual
+ * favorite transition so callers fire direction-aware events only on a real change.
+ */
+export async function setFavorite(paperId: string, isFavorite: boolean): Promise<LibraryState> {
   const res = await api.post(`${BASE}/${paperId}/favorite`, { isFavorite });
   return res.data;
 }

@@ -25,6 +25,7 @@ import {
   type RecWeights,
   type ReadingState,
   type PaperDetail,
+  type LibraryState,
 } from '@shared/api.interface';
 
 export interface LibraryFilters {
@@ -234,6 +235,78 @@ export class LibraryService {
       addedAt: toIsoDateTime(joined.lib.addedAt) ?? '',
       paper: joined.p ? mapPaperDetail(joined.p, joined.jName, joined.p.fetchedAt) : null,
       noteCount: joined.noteCount,
+    };
+  }
+
+  // ── Authoritative per-paper snapshot (favorite quick-action response) ──────
+  //
+  // Reads the live (user,paper) row and represents "no row at all" explicitly
+  // (rowExists=false, libraryId=null) instead of the old fake LibraryItem{id:null}.
+  private async buildState(userId: string, paperId: string): Promise<LibraryState> {
+    const [joined] = await this.db
+      .select({
+        lib: userLibrary,
+        noteCount: sql<number>`(SELECT count(*)::int FROM user_notes n WHERE n.paper_id = ${userLibrary.paperId} AND n.user_id = ${userLibrary.userId})`,
+      })
+      .from(userLibrary)
+      .where(and(eq(userLibrary.userId, userId), eq(userLibrary.paperId, paperId)))
+      .limit(1);
+
+    if (!joined) {
+      return {
+        paperId,
+        rowExists: false,
+        libraryId: null,
+        isFavorite: false,
+        readingState: null,
+        personalTags: null,
+        addedAt: null,
+        noteCount: 0,
+        changed: false,
+        favoriteTransition: 'none',
+      };
+    }
+    return {
+      paperId,
+      rowExists: true,
+      libraryId: joined.lib.id,
+      isFavorite: joined.lib.isFavorite,
+      readingState: (joined.lib.readingState as ReadingState | null) ?? null,
+      personalTags: joined.lib.personalTags,
+      addedAt: toIsoDateTime(joined.lib.addedAt),
+      noteCount: joined.noteCount,
+      changed: false,
+      favoriteTransition: 'none',
+    };
+  }
+
+  // Favorite quick-action. Performs the upsert/empty-row cleanup, then returns the post-state
+  // snapshot AND the ACTUAL favorite transition performed, so the client can fire direction-aware
+  // behavior events only when state really flipped (favorite vs unfavorite), and so a no-op
+  // repeat POST (already in the requested state) records nothing.
+  async setFavorite(userId: string, paperId: string, isFavorite: boolean): Promise<LibraryState> {
+    const [paper] = await this.db
+      .select({ id: papers.id })
+      .from(papers)
+      .where(eq(papers.id, paperId))
+      .limit(1);
+    if (!paper) throw new NotFoundException('论文不存在');
+
+    const before = await this.buildState(userId, paperId);
+    await this.upsert(userId, paperId, { isFavorite });
+    const after = await this.buildState(userId, paperId);
+
+    const favoriteTransition: LibraryState['favoriteTransition'] =
+      before.isFavorite === after.isFavorite
+        ? 'none'
+        : after.isFavorite
+          ? 'favorited'
+          : 'unfavorited';
+
+    return {
+      ...after,
+      changed: favoriteTransition !== 'none',
+      favoriteTransition,
     };
   }
 

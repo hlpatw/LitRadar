@@ -14,6 +14,7 @@ const ALLOWED = new Set<BehaviorEventType>([
   'library',
   'todo',
   'favorite',
+  'unfavorite',
   'uninterested',
   'note',
 ]);

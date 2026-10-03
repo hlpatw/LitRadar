@@ -1,31 +1,52 @@
 import React from 'react';
-import { toast } from 'sonner';
-import { Star, BookMarked, X, FileText } from 'lucide-react';
+import { BookMarked, X, FileText } from 'lucide-react';
 import * as api from '@/api';
 import type { RadarHistoryResponse, RadarTopItem, WeeklyRadarSnapshot } from '@shared/api.interface';
-import { trackImpression, trackDetail, trackLibrary, trackAction } from '@/utils/events';
+import { trackImpression, trackDetail } from '@/utils/events';
+import { FavoriteButton } from '@/library/FavoriteButton';
+import { addTodo, markUninterested } from '@/library/library-store';
+import { useLibraryPending } from '@/library/use-paper-library';
 
-async function quickAction(paperId: string, action: 'favorite' | 'todo' | 'uninterested') {
-  try {
-    if (action === 'favorite') {
-      await api.library.toggleFavorite(paperId, true);
-      trackAction('favorite', paperId);
-      trackLibrary(paperId); // a favorite creates/extends a library association
-    } else if (action === 'todo') {
-      await api.library.upsertLibrary(paperId, { readingState: 'todo' });
-      trackAction('todo', paperId);
-      trackLibrary(paperId);
-    } else {
-      await api.library.markUninterested(paperId);
-      trackAction('uninterested', paperId);
-    }
-    toast.success('已更新书架');
-  } catch (e) {
-    toast.error(e instanceof Error ? e.message : '操作失败');
-  }
+function ActionButton({
+  title,
+  onClick,
+  pending,
+  disabled,
+  danger,
+  children,
+}: {
+  title: string;
+  onClick: () => void;
+  pending: boolean;
+  disabled?: boolean;
+  danger?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      aria-busy={pending}
+      disabled={pending || disabled}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className={`rounded p-1.5 transition-colors disabled:cursor-wait disabled:opacity-60 ${
+        danger
+          ? 'text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-red-600'
+          : 'text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--primary)]'
+      }`}
+    >
+      {children}
+    </button>
+  );
 }
 
 function RadarRow({ item, onOpenPaper }: { item: RadarTopItem; onOpenPaper: (id: string) => void }) {
+  const todoBusy = useLibraryPending(item.paper.id, 'todo');
+  const uninterestedBusy = useLibraryPending(item.paper.id, 'uninterested');
   return (
     <div className="rounded-[8px] border border-[var(--border)] bg-white p-[14px_16px]">
       <div className="flex items-start gap-3">
@@ -61,15 +82,13 @@ function RadarRow({ item, onOpenPaper }: { item: RadarTopItem; onOpenPaper: (id:
           )}
         </div>
         <div className="flex shrink-0 flex-col gap-1">
-          <button title="收藏" onClick={() => quickAction(item.paper.id, 'favorite')} className="rounded p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--primary)]">
-            <Star size={15} />
-          </button>
-          <button title="加入待读" onClick={() => quickAction(item.paper.id, 'todo')} className="rounded p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-[var(--primary)]">
-            <BookMarked size={15} />
-          </button>
-          <button title="不感兴趣" onClick={() => quickAction(item.paper.id, 'uninterested')} className="rounded p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--accent)] hover:text-red-600">
-            <X size={15} />
-          </button>
+          <FavoriteButton paperId={item.paper.id} />
+          <ActionButton title="加入待读" pending={todoBusy} onClick={() => addTodo(item.paper.id)}>
+            <BookMarked size={15} className={todoBusy ? 'animate-pulse' : ''} />
+          </ActionButton>
+          <ActionButton title="不感兴趣" pending={uninterestedBusy} danger onClick={() => markUninterested(item.paper.id)}>
+            <X size={15} className={uninterestedBusy ? 'animate-pulse' : ''} />
+          </ActionButton>
         </div>
       </div>
     </div>

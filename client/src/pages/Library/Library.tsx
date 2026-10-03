@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Star, BookOpen, Filter, RotateCcw, XCircle, Trash2, Sparkles, StickyNote } from 'lucide-react';
+import { BookOpen, RotateCcw, XCircle, Trash2, Sparkles, StickyNote } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
 import { library as libraryApi, workspace as workspaceApi } from '@/api';
+import { FavoriteButton } from '@/library/FavoriteButton';
+import { hydratePaperLibrary, setReadingState, addToLibrary, markUninterested } from '@/library/library-store';
+import { usePaperLibraryState } from '@/library/use-paper-library';
 import type {
   LibraryItem,
   RecommendationItem,
@@ -29,35 +32,27 @@ const STATE_LABEL: Record<string, string> = { todo: '待读', reading: '阅读�
 
 function LibraryRow({
   item,
+  statusMode,
   onChanged,
 }: {
   item: LibraryItem;
+  statusMode: string;
   onChanged: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const paper = item.paper;
+  // Read the shared authoritative store: in the favorite filter, an unfavorited paper leaves
+  // the list immediately (optimistic), and reappears if the request rolls back on failure.
+  const lib = usePaperLibraryState(item.paperId);
+
+  if (statusMode === 'favorite' && !lib.isFavorite) return null;
 
   const cycleState = async () => {
     setBusy(true);
     try {
       const next = item.readingState === 'todo' ? 'reading' : item.readingState === 'reading' ? 'read' : 'todo';
-      await libraryApi.setReadingState(item.paperId, next);
-      toast.success('已更新阅读状态');
+      await setReadingState(item.paperId, next as any);
       onChanged();
-    } catch {
-      toast.error('更新失败');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const toggleFav = async () => {
-    setBusy(true);
-    try {
-      await libraryApi.toggleFavorite(item.paperId, !item.isFavorite);
-      onChanged();
-    } catch {
-      toast.error('操作失败');
     } finally {
       setBusy(false);
     }
@@ -94,9 +89,6 @@ function LibraryRow({
                 {STATE_LABEL[item.readingState]}
               </Badge>
             )}
-            {item.isFavorite && (
-              <Star className="size-3.5 fill-[var(--primary)] text-[var(--primary)]" />
-            )}
             {item.personalTags?.split(',').filter(Boolean).map((t) => (
               <Badge key={t.trim()} variant="secondary" className="font-mono text-[10.5px]">
                 {t.trim()}
@@ -118,10 +110,7 @@ function LibraryRow({
           <BookOpen className="size-3.5" />
           {item.readingState ? `状态: ${STATE_LABEL[item.readingState]}` : '设为待读'}
         </Button>
-        <Button size="sm" variant="outline" className="h-7 text-xs rounded-[8px]" disabled={busy} onClick={toggleFav}>
-          <Star className={`size-3.5 ${item.isFavorite ? 'fill-[var(--primary)] text-[var(--primary)]' : ''}`} />
-          {item.isFavorite ? '已收藏' : '收藏'}
-        </Button>
+        <FavoriteButton paperId={item.paperId} labeled onToggled={() => onChanged()} />
         <Button size="sm" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" disabled={busy} onClick={remove}>
           <Trash2 className="size-3.5" />
         </Button>
@@ -135,11 +124,8 @@ function RecCard({ item, onSaved }: { item: RecommendationItem; onSaved: (paperI
   const save = async () => {
     setBusy(true);
     try {
-      await libraryApi.upsertLibrary(item.paper.id, { isFavorite: true, readingState: 'todo' });
-      toast.success('已加入书架并设为待读');
+      await addToLibrary(item.paper.id); // shared store: pending guard + toast + events
       onSaved(item.paper.id);
-    } catch {
-      toast.error('加入失败');
     } finally {
       setBusy(false);
     }
@@ -147,11 +133,8 @@ function RecCard({ item, onSaved }: { item: RecommendationItem; onSaved: (paperI
   const skip = async () => {
     setBusy(true);
     try {
-      await libraryApi.markUninterested(item.paper.id);
-      toast.success('已标记不感兴趣');
+      await markUninterested(item.paper.id);
       onSaved(item.paper.id);
-    } catch {
-      toast.error('操作失败');
     } finally {
       setBusy(false);
     }
@@ -227,6 +210,17 @@ export default function Library() {
       setItems(lib.items);
       setRecs(reco.items);
       setColdStart(reco.coldStart);
+      // Seed the shared store with authoritative state so favorite buttons stay current and
+      // cross-page synced (and the favorite-filter row can hide on optimistic unfavorite).
+      for (const it of lib.items) {
+        hydratePaperLibrary(it.paperId, {
+          isFavorite: it.isFavorite,
+          readingState: it.readingState,
+          personalTags: it.personalTags,
+          noteCount: it.noteCount,
+          inLibrary: true,
+        });
+      }
     } catch {
       toast.error('加载书架失败');
     } finally {
@@ -332,7 +326,7 @@ export default function Library() {
         ) : (
           <div className="mt-3 flex flex-col gap-[14px]">
             {items.map((it) => (
-              <LibraryRow key={it.id} item={it} onChanged={() => fetchData()} />
+              <LibraryRow key={it.id} item={it} statusMode={status} onChanged={() => fetchData()} />
             ))}
           </div>
         )}

@@ -16,6 +16,7 @@
     "test:migrations": "node --experimental-strip-types scripts/migration.fixtures.ts && node --experimental-strip-types scripts/library.migration.test.ts",
     "test:e2e": "node --experimental-strip-types scripts/e2e.flow.ts",
     "test:e2e:auth": "node --experimental-strip-types scripts/e2e.auth.ts",
+    "test:e2e:library": "node --experimental-strip-types scripts/e2e.library-interaction.ts",
     "test:radar-week": "node --experimental-strip-types scripts/radar.week.test.ts",
     "test:scheduler-gates": "node --experimental-strip-types scripts/scheduler.gates.ts",
     "migrate": "node --experimental-strip-types scripts/migrate.ts"
